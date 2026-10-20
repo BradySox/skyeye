@@ -76,6 +76,8 @@ type Application struct {
 	strike *simpleradio.RadioFrequency
 	// looseCalls lets a package call on strike name only the pilot, set by the mission link
 	looseCalls bool
+	// strikeThreatsOnly keeps the GCI on strike to threat calls, set by the mission link
+	strikeThreatsOnly bool
 	// speakerLock prevents multiple instances from running the speaker at the same time
 	speakerLock *flock.Flock
 	// volume is the audio output volume level
