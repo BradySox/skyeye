@@ -62,6 +62,9 @@ type Say struct {
 	Type      string `json:"type"`
 	Frequency string `json:"frequency"`
 	Text      string `json:"text"`
+	// Speech is what is spoken, when it differs from the text: "squawk four one zero one" for
+	// "squawk 4101", which Piper would read as a number. Empty speaks the text.
+	Speech string `json:"speech,omitempty"`
 	// Voice is "feminine" or "masculine"; empty uses SkyEye's own voice.
 	Voice string `json:"voice,omitempty"`
 }

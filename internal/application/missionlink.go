@@ -281,8 +281,12 @@ func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[com
 			if voice, ok := parseVoice(say.Voice); ok {
 				rCtx = withVoice(rCtx, voice)
 			}
+			speech := say.Speech
+			if speech == "" {
+				speech = say.Text
+			}
 			select {
-			case out <- AsMessage(rCtx, composer.NaturalLanguageResponse{Speech: say.Text, Subtitle: say.Text}):
+			case out <- AsMessage(rCtx, composer.NaturalLanguageResponse{Speech: speech, Subtitle: say.Text}):
 			case <-ctx.Done():
 			case <-time.After(30 * time.Second):
 				log.Warn().Msg("dropped mission line: speech queue is full")
