@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/dharmab/skyeye/pkg/brevity"
@@ -62,12 +63,12 @@ func isImportant(ctx context.Context) bool {
 	return important
 }
 
-func withVoice(ctx context.Context, voice voices.Voice) context.Context {
+func withVoice(ctx context.Context, voice string) context.Context {
 	return context.WithValue(ctx, voiceKey{}, voice)
 }
 
-func voiceFrom(ctx context.Context) (voices.Voice, bool) {
-	voice, ok := ctx.Value(voiceKey{}).(voices.Voice)
+func voiceFrom(ctx context.Context) (string, bool) {
+	voice, ok := ctx.Value(voiceKey{}).(string)
 	return voice, ok
 }
 
@@ -81,14 +82,34 @@ func isImportantCall(call any) bool {
 	return false
 }
 
-func parseVoice(name string) (voices.Voice, bool) {
-	switch name {
-	case "feminine":
-		return voices.FeminineVoice, true
-	case "masculine":
-		return voices.MasculineVoice, true
+// Voice names: "feminine" and "masculine" are the built-in voices; anything else is a Piper voice
+// folder under the voices directory, optionally "#speaker" for one speaker of a multi-speaker
+// model, such as "en_US-l2arctic-medium#ABA".
+const (
+	feminineVoiceName  = "feminine"
+	masculineVoiceName = "masculine"
+)
+
+func builtinVoiceName(voice voices.Voice) string {
+	if voice == voices.MasculineVoice {
+		return masculineVoiceName
 	}
-	return voices.FeminineVoice, false
+	return feminineVoiceName
+}
+
+func parseVoice(name string) (string, bool) {
+	name = strings.TrimSpace(name)
+	return name, name != ""
+}
+
+func (a *Application) newSpeaker(voice string) (speakers.Speaker, error) {
+	switch voice {
+	case feminineVoiceName:
+		return speakers.NewPiperSpeaker(voices.FeminineVoice, a.voiceSpeed, a.voicePause)
+	case masculineVoiceName:
+		return speakers.NewPiperSpeaker(voices.MasculineVoice, a.voiceSpeed, a.voicePause)
+	}
+	return speakers.NewDiskSpeaker(a.voicesDir, voice, a.voiceSpeed, a.voicePause)
 }
 
 // speakerFor is the speaker for a call: the voice its context asks for, else SkyEye's own voice.
@@ -106,9 +127,12 @@ func (a *Application) speakerFor(ctx context.Context) (speakers.Speaker, error) 
 	if speaker, ok := a.voiceSpeakers[voice]; ok {
 		return speaker, nil
 	}
-	speaker, err := speakers.NewPiperSpeaker(voice, a.voiceSpeed, a.voicePause)
+	speaker, err := a.newSpeaker(voice)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create speaker: %w", err)
+		// A missing or broken voice falls back to SkyEye's own, so the call is still heard.
+		log.Warn().Err(err).Str("voice", voice).Msg("voice unavailable, using the default voice")
+		a.voiceSpeakers[voice] = a.speaker
+		return a.speaker, nil
 	}
 	a.voiceSpeakers[voice] = speaker
 	return speaker, nil

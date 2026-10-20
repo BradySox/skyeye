@@ -120,6 +120,11 @@
 # does not step on the package traffic. The mission picks SkyEye's voice and
 # the controller's voice. Local only.
 #mission-link-address: 127.0.0.1:42690
+#
+# Extra Piper voices a mission may ask for, one subfolder per voice (for example
+# voices/en_GB-alan-medium with its .onnx and .onnx.json). Download voices from
+# https://huggingface.co/rhasspy/piper-voices.
+#voices-dir: voices
 
 # IDENTITY
 # Set the callsign to whatever you want the GCI to use as the callsign. Good

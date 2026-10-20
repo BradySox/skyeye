@@ -53,6 +53,7 @@ var (
 	grpcAddress                  string
 	grpcAPIKey                   string
 	missionLinkAddress           string
+	voicesDir                    string
 	controllerCallsign           string
 	controllerCallsigns          []string
 	coalitionName                string
@@ -122,6 +123,7 @@ func init() {
 	skyeye.Flags().StringVar(&grpcAPIKey, "grpc-api-key", "", "API key for DCS-gRPC authentication")
 
 	// Mission link
+	skyeye.Flags().StringVar(&voicesDir, "voices-dir", "voices", "Folder of extra Piper voices, one subfolder per voice, that a mission link may ask for")
 	skyeye.Flags().StringVar(&missionLinkAddress, "mission-link-address", "", "Local UDP address for a mission script running a package controller, e.g. 127.0.0.1:42690. Empty disables it")
 
 	// Identity
@@ -479,6 +481,7 @@ func run(_ *cobra.Command, _ []string) {
 		GRPCAddress:                  grpcAddress,
 		GRPCAPIKey:                   grpcAPIKey,
 		MissionLinkAddress:           missionLinkAddress,
+		VoicesDir:                    voicesDir,
 		EnableTerrainDetection:       enableTerrainDetection,
 		Locations:                    locs,
 		CustomAircraft:               customAircraft,

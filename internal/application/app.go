@@ -26,7 +26,6 @@ import (
 	"github.com/dharmab/skyeye/pkg/simpleradio"
 	srs "github.com/dharmab/skyeye/pkg/simpleradio/types"
 	"github.com/dharmab/skyeye/pkg/synthesizer/speakers"
-	"github.com/dharmab/skyeye/pkg/synthesizer/voices"
 	"github.com/dharmab/skyeye/pkg/telemetry"
 	"github.com/dharmab/skyeye/pkg/traces"
 	"github.com/gofrs/flock"
@@ -63,11 +62,13 @@ type Application struct {
 	// speaker provides text-to-speech synthesis
 	speaker speakers.Speaker
 	// voiceSpeakers are extra Piper speakers by voice, for mission lines in another voice
-	voiceSpeakers map[voices.Voice]speakers.Speaker
+	voiceSpeakers map[string]speakers.Speaker
+	// voicesDir holds extra Piper voices a mission may ask for
+	voicesDir string
 	// speakersLock guards speakers, gciVoice and strike
 	speakersLock sync.Mutex
 	// gciVoice is SkyEye's own voice; a mission may change it
-	gciVoice voices.Voice
+	gciVoice string
 	// voiceSpeed and voicePause configure extra speakers
 	voiceSpeed float64
 	voicePause time.Duration
@@ -274,8 +275,9 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		controller:                 gciController,
 		composer:                   responseComposer,
 		speaker:                    synthesizer,
-		voiceSpeakers:              map[voices.Voice]speakers.Speaker{config.Voice: synthesizer},
-		gciVoice:                   config.Voice,
+		voiceSpeakers:              map[string]speakers.Speaker{builtinVoiceName(config.Voice): synthesizer},
+		gciVoice:                   builtinVoiceName(config.Voice),
+		voicesDir:                  config.VoicesDir,
 		voiceSpeed:                 config.VoiceSpeed,
 		voicePause:                 config.VoicePauseLength,
 		speakerLock:                config.VoiceLock,
