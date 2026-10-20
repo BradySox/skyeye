@@ -11,8 +11,16 @@ import (
 // ATC calls are parsed apart from GCI calls: they are heard only on airfield frequencies, open with
 // the controller's position instead of a GCI callsign, and a readback ends with the callsign.
 
-// atcPositions are the controller positions a pilot may call.
-var atcPositions = []string{"ground", "tower", "approach", "departure", "arrival"}
+// Controller positions a pilot may call.
+const (
+	positionGround    = "ground"
+	positionTower     = "tower"
+	positionApproach  = "approach"
+	positionDeparture = "departure"
+	positionArrival   = "arrival"
+)
+
+var atcPositions = []string{positionGround, positionTower, positionApproach, positionDeparture, positionArrival}
 
 // maxFieldNameWords is the most words an airfield name may take before the position.
 const maxFieldNameWords = 4
