@@ -132,7 +132,54 @@ func TestParseATC(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.text, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, test.expected, ParseATC(test.text))
+			require.Equal(t, test.expected, ParseATC(test.text, false))
 		})
 	}
+}
+
+func TestParseATCLoose(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		text     string
+		expected *brevity.ATCRequest
+	}{
+		{
+			text: "Viper 1-1, request taxi",
+			expected: &brevity.ATCRequest{
+				Callsign: "viper 1 1", Kind: brevity.ATCTaxi,
+				Text: "viper 1 1 request taxi",
+			},
+		},
+		{
+			text: "Tower, ready for takeoff",
+			expected: &brevity.ATCRequest{
+				Position: positionTower, Kind: brevity.ATCReady,
+				Text: "tower ready for takeoff",
+			},
+		},
+		{
+			text: "Request engine start",
+			expected: &brevity.ATCRequest{
+				Kind: brevity.ATCStartup,
+				Text: "request engine start",
+			},
+		},
+		{
+			// A readback still reads as one.
+			text: "Hold short 25, Viper 1-1",
+			expected: &brevity.ATCRequest{
+				Callsign: "viper 1 1", Kind: brevity.ATCReadback, Numbers: []string{"25"},
+				Text: "hold short 2 5 viper 1 1",
+			},
+		},
+		{text: "Nice weather today", expected: nil},
+	}
+	for _, test := range testCases {
+		t.Run(test.text, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, test.expected, ParseATC(test.text, true))
+		})
+	}
+	// Strict parsing ignores a call with no station.
+	require.Nil(t, ParseATC("Viper 1-1, request taxi", false))
 }

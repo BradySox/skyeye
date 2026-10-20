@@ -208,22 +208,24 @@ func (a *Application) applyATC(atc missionlink.ATC) {
 	}
 	a.speakersLock.Lock()
 	a.atcFrequencies = frequencies
+	a.atcLoose = atc.Discipline == "casual"
 	a.speakersLock.Unlock()
 	if err := a.srsClient.AddListenRadios(frequencies); err != nil {
 		log.Error().Err(err).Msg("failed to tune ATC frequencies")
 	}
 }
 
-// isATCFrequency is true if the frequency is one of the mission's airfield frequencies.
-func (a *Application) isATCFrequency(frequency simpleradio.RadioFrequency) bool {
+// isATCFrequency is true if the frequency is one of the mission's airfield frequencies. loose is
+// true when the mission parses ATC calls loosely.
+func (a *Application) isATCFrequency(frequency simpleradio.RadioFrequency) (atc bool, loose bool) {
 	a.speakersLock.Lock()
 	defer a.speakersLock.Unlock()
 	for _, f := range a.atcFrequencies {
 		if f.IsSameFrequency(frequency) {
-			return true
+			return true, a.atcLoose
 		}
 	}
-	return false
+	return false, false
 }
 
 // runMissionLink applies the mission's packages and speaks its lines.

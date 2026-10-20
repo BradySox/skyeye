@@ -110,6 +110,9 @@ type ATCField struct {
 type ATC struct {
 	Type   string     `json:"type"`
 	Fields []ATCField `json:"fields"`
+	// Discipline is the mission's radio discipline: "strict", "relaxed" or "casual". Casual
+	// parses calls loosely.
+	Discipline string `json:"discipline,omitempty"`
 }
 
 // ATCRequest is an ATC call SkyEye heard, sent to the mission. Numbers is space-separated, so the

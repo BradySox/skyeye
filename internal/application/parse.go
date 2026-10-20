@@ -30,10 +30,14 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 	}
 	logger.Info().Msg("parsing text")
 	var request any
-	if frequency, ok := heardFrequencyFrom(ctx); ok && a.isATCFrequency(frequency) {
+	atc, loose := false, false
+	if frequency, ok := heardFrequencyFrom(ctx); ok {
+		atc, loose = a.isATCFrequency(frequency)
+	}
+	if atc {
 		// An airfield frequency carries ATC calls only: the GCI never answers there.
-		if atc := parser.ParseATC(text); atc != nil {
-			request = atc
+		if call := parser.ParseATC(text, loose); call != nil {
+			request = call
 		}
 	} else {
 		request = a.parser.Parse(text)

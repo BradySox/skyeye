@@ -36,6 +36,12 @@ var atcCallsignHomophones = map[string]string{
 	"free": "3", "tree": "3", "ate": "8",
 }
 
+// notCallsignWords open a request, never a callsign: "ready for takeoff" is not "Ready 4".
+var notCallsignWords = map[string]bool{
+	"request": true, "requesting": true, "ready": true, "holding": true, "taxi": true,
+	"inbound": true, "clear": true, "airborne": true, "say": true, "radio": true,
+}
+
 // distanceWords follow a distance, which is never part of a callsign.
 var distanceWords = map[string]bool{"mile": true, "miles": true, "out": true}
 
@@ -109,7 +115,7 @@ func callsignSpan(tokens []string, start int) (string, int, bool) {
 		name = append(name, tokens[i])
 		i++
 	}
-	if len(name) == 0 {
+	if len(name) == 0 || notCallsignWords[name[0]] {
 		return "", start, false
 	}
 	var digits []string
@@ -255,7 +261,11 @@ func withoutSpan(tokens []string, from, to int) []string {
 // ParseATC reads a call heard on an airfield frequency. A call opens with the controller ("Kobuleti
 // Ground", or just "Tower"), then the callsign and the request; a mayday opens with "mayday"; a
 // readback is the clearance's items, then the callsign. Returns nil for chatter with no callsign.
-func ParseATC(tx string) *brevity.ATCRequest {
+//
+// Loose parsing is for the mission's Casual radio discipline: a call may leave out the station
+// ("Viper 1-1, request taxi") or the callsign ("Tower, ready for takeoff"), and the mission
+// works out who called from the frequency.
+func ParseATC(tx string, loose bool) *brevity.ATCRequest {
 	if len(tx) > maxInputLength {
 		tx = tx[:maxInputLength]
 	}
@@ -285,7 +295,10 @@ func ParseATC(tx string) *brevity.ATCRequest {
 	if position, idx, ok := findPosition(tokens); ok {
 		callsign, end, ok := callsignSpan(tokens, idx+1)
 		if !ok {
-			return nil
+			if !loose {
+				return nil
+			}
+			end = idx + 1
 		}
 		rest := tokens[end:]
 		kind, detail := atcKind(rest)
@@ -301,6 +314,9 @@ func ParseATC(tx string) *brevity.ATCRequest {
 
 	callsign, start, ok := tailCallsign(tokens)
 	if !ok {
+		if loose {
+			return looseRequest(tokens, text)
+		}
 		return nil
 	}
 	items := withoutSpan(tokens, start, len(tokens))
@@ -312,6 +328,27 @@ func ParseATC(tx string) *brevity.ATCRequest {
 		Callsign: callsign,
 		Kind:     kind,
 		Numbers:  atcNumbers(items),
+		Text:     text,
+	}
+}
+
+// looseRequest reads a call with no station: the callsign first if there is one, then the request.
+// A call that names no request SkyEye knows is chatter.
+func looseRequest(tokens []string, text string) *brevity.ATCRequest {
+	callsign, end, ok := callsignSpan(tokens, 0)
+	if !ok {
+		end = 0
+	}
+	rest := tokens[end:]
+	kind, detail := atcKind(rest)
+	if kind == brevity.ATCUnknown {
+		return nil
+	}
+	return &brevity.ATCRequest{
+		Callsign: callsign,
+		Kind:     kind,
+		Detail:   detail,
+		Numbers:  atcNumbers(rest),
 		Text:     text,
 	}
 }
