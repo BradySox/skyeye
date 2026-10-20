@@ -39,9 +39,9 @@ type Parser struct {
 }
 
 // SetPackageControllers replaces the package controller callsigns the parser listens for.
-func (p *Parser) SetPackageControllers(callsigns []string) {
-	normalized := make([]string, 0, len(callsigns))
-	for _, callsign := range callsigns {
+func (p *Parser) SetPackageControllers(controllers []string) {
+	normalized := make([]string, 0, len(controllers))
+	for _, callsign := range controllers {
 		if c := strings.ToLower(strings.ReplaceAll(callsign, " ", "")); c != "" {
 			normalized = append(normalized, c)
 		}
@@ -55,7 +55,8 @@ func (p *Parser) SetPackageControllers(callsigns []string) {
 func (p *Parser) wakePhrases() []string {
 	p.packageControllersLock.RLock()
 	defer p.packageControllersLock.RUnlock()
-	phrases := []string{p.controllerCallsign, Anyface}
+	phrases := make([]string, 0, 2+len(p.packageControllers))
+	phrases = append(phrases, p.controllerCallsign, Anyface)
 	return append(phrases, p.packageControllers...)
 }
 
