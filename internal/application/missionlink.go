@@ -114,6 +114,13 @@ func (a *Application) speakerFor(ctx context.Context) (speakers.Speaker, error) 
 	return speaker, nil
 }
 
+// currentComposer is a copy of the composer under the callsign lock.
+func (a *Application) currentComposer() composer.Composer {
+	a.speakersLock.Lock()
+	defer a.speakersLock.Unlock()
+	return a.composer
+}
+
 // strikeFrequency is the mission's strike frequency, if a mission has sent one.
 func (a *Application) strikeFrequency() (simpleradio.RadioFrequency, bool) {
 	a.speakersLock.Lock()
@@ -137,6 +144,13 @@ func (a *Application) applyPackages(packages missionlink.Packages) {
 			a.strike = strike
 			a.speakersLock.Unlock()
 		}
+	}
+	if packages.GCICallsign != "" {
+		a.parser.SetCallsign(packages.GCICallsign)
+		a.speakersLock.Lock()
+		a.composer.Callsign = packages.GCICallsign
+		a.speakersLock.Unlock()
+		log.Info().Str("callsign", packages.GCICallsign).Msg("mission set the GCI callsign")
 	}
 	if voice, ok := parseVoice(packages.GCIVoice); ok {
 		a.speakersLock.Lock()

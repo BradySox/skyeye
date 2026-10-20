@@ -52,6 +52,19 @@ func (p *Parser) SetPackageControllers(controllers []string) {
 	p.packageControllers = normalized
 }
 
+// SetCallsign replaces the GCI callsign, for a mission that names the AWACS itself.
+func (p *Parser) SetCallsign(callsign string) {
+	p.packageControllersLock.Lock()
+	defer p.packageControllersLock.Unlock()
+	p.controllerCallsign = strings.ReplaceAll(callsign, " ", "")
+}
+
+func (p *Parser) callsign() string {
+	p.packageControllersLock.RLock()
+	defer p.packageControllersLock.RUnlock()
+	return p.controllerCallsign
+}
+
 // wakePhrases is the GCI callsign, ANYFACE, then any package controller callsigns.
 func (p *Parser) wakePhrases() []string {
 	p.packageControllersLock.RLock()
@@ -236,7 +249,7 @@ func (p *Parser) Parse(tx string) any {
 		tx = tx[:maxInputLength]
 	}
 
-	logger := log.With().Str("gci", p.controllerCallsign).Logger()
+	logger := log.With().Str("gci", p.callsign()).Logger()
 	if p.enableTextLogging {
 		logger = logger.With().Str("text", tx).Logger()
 	}

@@ -31,43 +31,44 @@ func (a *Application) composeCall(ctx context.Context, call any, out chan<- Mess
 	logger := log.With().Type("type", call).Any("params", call).Logger()
 	logger.Info().Msg("composing brevity call")
 	var response composer.NaturalLanguageResponse
+	comp := a.currentComposer()
 	switch c := call.(type) {
 	case brevity.AlphaCheckResponse:
-		response = a.composer.ComposeAlphaCheckResponse(c)
+		response = comp.ComposeAlphaCheckResponse(c)
 	case brevity.BogeyDopeResponse:
-		response = a.composer.ComposeBogeyDopeResponse(c)
+		response = comp.ComposeBogeyDopeResponse(c)
 	case brevity.CheckInResponse:
-		response = a.composer.ComposeCheckInResponse(c)
+		response = comp.ComposeCheckInResponse(c)
 	case brevity.DeclareResponse:
-		response = a.composer.ComposeDeclareResponse(c)
+		response = comp.ComposeDeclareResponse(c)
 	case brevity.FadedCall:
-		response = a.composer.ComposeFadedCall(c)
+		response = comp.ComposeFadedCall(c)
 	case brevity.NegativeRadarContactResponse:
-		response = a.composer.ComposeNegativeRadarContactResponse(c)
+		response = comp.ComposeNegativeRadarContactResponse(c)
 	case brevity.PictureResponse:
-		response = a.composer.ComposePictureResponse(c)
+		response = comp.ComposePictureResponse(c)
 	case brevity.RadioCheckResponse:
-		response = a.composer.ComposeRadioCheckResponse(c)
+		response = comp.ComposeRadioCheckResponse(c)
 	case brevity.ShoppingResponse:
-		response = a.composer.ComposeShoppingResponse(c)
+		response = comp.ComposeShoppingResponse(c)
 	case brevity.SnaplockResponse:
-		response = a.composer.ComposeSnaplockResponse(c)
+		response = comp.ComposeSnaplockResponse(c)
 	case brevity.SpikedResponseV2:
-		response = a.composer.ComposeSpikedResponse(c)
+		response = comp.ComposeSpikedResponse(c)
 	case brevity.StrobeResponse:
-		response = a.composer.ComposeStrobeResponse(c)
+		response = comp.ComposeStrobeResponse(c)
 	case brevity.TripwireResponse:
-		response = a.composer.ComposeTripwireResponse(c)
+		response = comp.ComposeTripwireResponse(c)
 	case brevity.VectorResponse:
-		response = a.composer.ComposeVectorResponse(c)
+		response = comp.ComposeVectorResponse(c)
 	case brevity.SunriseCall:
-		response = a.composer.ComposeSunriseCall(c)
+		response = comp.ComposeSunriseCall(c)
 	case brevity.ThreatCall:
-		response = a.composer.ComposeThreatCall(c)
+		response = comp.ComposeThreatCall(c)
 	case brevity.MergedCall:
-		response = a.composer.ComposeMergedCall(c)
+		response = comp.ComposeMergedCall(c)
 	case brevity.SayAgainResponse:
-		response = a.composer.ComposeSayAgainResponse(c)
+		response = comp.ComposeSayAgainResponse(c)
 	default:
 		logger.Debug().Msg("unable to route call to composition")
 		a.trace(traces.WithRequestError(ctx, errors.New("no route for call")))

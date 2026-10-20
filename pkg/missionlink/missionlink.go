@@ -46,6 +46,8 @@ type Packages struct {
 	Strike string `json:"strike,omitempty"`
 	// GCIVoice is "feminine" or "masculine": SkyEye's own voice for this mission.
 	GCIVoice string `json:"gciVoice,omitempty"`
+	// GCICallsign is SkyEye's own callsign for this mission, such as "Chainsaw".
+	GCICallsign string `json:"gciCallsign,omitempty"`
 }
 
 // Say asks SkyEye to speak a line on a frequency.

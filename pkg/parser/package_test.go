@@ -67,3 +67,11 @@ func TestParserIgnoresAnUnknownControllerCallsign(t *testing.T) {
 	t.Parallel()
 	require.Nil(t, New(TestCallsign, []string{}, true).Parse("Darkstar, Colt 1-1, checking in."))
 }
+
+func TestParserTakesANewCallsign(t *testing.T) {
+	t.Parallel()
+	p := newPackageParser()
+	p.SetCallsign("Chainsaw")
+	require.IsType(t, &brevity.RadioCheckRequest{}, p.Parse("Chainsaw, Colt 1-1, radio check."))
+	require.Nil(t, p.Parse("Skyeye, Colt 1-1, radio check."))
+}
