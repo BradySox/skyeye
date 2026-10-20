@@ -1,7 +1,6 @@
 package missionlink
 
 import (
-	"context"
 	"encoding/json"
 	"net"
 	"testing"
@@ -17,8 +16,7 @@ func TestLinkRoundTrip(t *testing.T) {
 
 	packagesCh := make(chan Packages, 1)
 	sayCh := make(chan Say, 1)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	go link.Run(ctx, Handlers{
 		OnPackages: func(p Packages) { packagesCh <- p },
 		OnSay:      func(s Say) { sayCh <- s },

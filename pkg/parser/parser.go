@@ -2,6 +2,7 @@
 package parser
 
 import (
+	"slices"
 	"strings"
 	"sync"
 
@@ -64,12 +65,7 @@ func (p *Parser) wakePhrases() []string {
 func (p *Parser) isPackageController(phrase string) bool {
 	p.packageControllersLock.RLock()
 	defer p.packageControllersLock.RUnlock()
-	for _, controller := range p.packageControllers {
-		if controller == phrase {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.packageControllers, phrase)
 }
 
 // New creates a new parser.
