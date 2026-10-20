@@ -46,10 +46,14 @@ type voiceConfig struct {
 
 // NewDiskSpeaker creates a Speaker from a Piper voice under voicesDir. name is the voice folder,
 // such as "en_GB-alan-medium", optionally followed by "#" and a speaker of a multi-speaker
-// model, such as "en_US-l2arctic-medium#ABA".
+// model, such as "en_US-l2arctic-medium#ABA". A folder with a voices.bin is a Kokoro model, and
+// "kokoro#am_eric" speaks with its am_eric voice.
 func NewDiskSpeaker(voicesDir, name string, playbackSpeed float64, playbackPause time.Duration) (Speaker, error) {
 	folder, speakerName, _ := strings.Cut(name, "#")
 	dir := filepath.Join(voicesDir, folder)
+	if _, err := os.Stat(filepath.Join(dir, "voices.bin")); err == nil {
+		return NewKokoroSpeaker(dir, speakerName, playbackSpeed)
+	}
 	model := filepath.Join(dir, folder+".onnx")
 	config := model + ".json"
 	b, err := os.ReadFile(config)
