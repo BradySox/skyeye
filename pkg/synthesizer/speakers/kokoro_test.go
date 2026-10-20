@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/martinlindhe/unit"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,12 +19,12 @@ func TestWavPCM(t *testing.T) {
 	wav = binary.LittleEndian.AppendUint32(wav, 48000)
 	wav = append(wav, 2, 0, 16, 0)
 	wav = append(wav, []byte("data")...)
-	wav = binary.LittleEndian.AppendUint32(wav, uint32(len(data)))
+	wav = binary.LittleEndian.AppendUint32(wav, 4)
 	wav = append(wav, data...)
 	samples, rate, err := wavPCM(wav)
 	require.NoError(t, err)
 	require.Equal(t, data, samples)
-	require.Equal(t, 24000*unit.Hertz, rate)
+	require.InDelta(t, 24000, rate.Hertz(), 0.001)
 
 	_, _, err = wavPCM([]byte("nope"))
 	require.Error(t, err)
