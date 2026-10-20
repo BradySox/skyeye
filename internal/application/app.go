@@ -26,6 +26,7 @@ import (
 	"github.com/dharmab/skyeye/pkg/simpleradio"
 	srs "github.com/dharmab/skyeye/pkg/simpleradio/types"
 	"github.com/dharmab/skyeye/pkg/synthesizer/speakers"
+	"github.com/dharmab/skyeye/pkg/synthesizer/voices"
 	"github.com/dharmab/skyeye/pkg/telemetry"
 	"github.com/dharmab/skyeye/pkg/traces"
 	"github.com/gofrs/flock"
@@ -61,6 +62,17 @@ type Application struct {
 	composer composer.Composer
 	// speaker provides text-to-speech synthesis
 	speaker speakers.Speaker
+	// voiceSpeakers are extra Piper speakers by voice, for mission lines in another voice
+	voiceSpeakers map[voices.Voice]speakers.Speaker
+	// speakersLock guards speakers, gciVoice and strike
+	speakersLock sync.Mutex
+	// gciVoice is SkyEye's own voice; a mission may change it
+	gciVoice voices.Voice
+	// voiceSpeed and voicePause configure extra speakers
+	voiceSpeed float64
+	voicePause time.Duration
+	// strike is the mission's strike frequency, set by the mission link
+	strike *simpleradio.RadioFrequency
 	// speakerLock prevents multiple instances from running the speaker at the same time
 	speakerLock *flock.Flock
 	// volume is the audio output volume level
@@ -262,6 +274,10 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		controller:                 gciController,
 		composer:                   responseComposer,
 		speaker:                    synthesizer,
+		voiceSpeakers:              map[voices.Voice]speakers.Speaker{config.Voice: synthesizer},
+		gciVoice:                   config.Voice,
+		voiceSpeed:                 config.VoiceSpeed,
+		voicePause:                 config.VoicePauseLength,
 		speakerLock:                config.VoiceLock,
 		volume:                     config.Volume,
 		tracers:                    tracers,

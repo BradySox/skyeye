@@ -40,6 +40,12 @@ type Packages struct {
 	Type        string    `json:"type"`
 	Controllers []string  `json:"controllers"`
 	Packages    []Package `json:"packages"`
+	// Strike is the common strike frequency, such as "264.500AM". SkyEye joins it as the
+	// GCI, but only for calls that matter there: answers to calls heard on it, threat
+	// calls and merges.
+	Strike string `json:"strike,omitempty"`
+	// GCIVoice is "feminine" or "masculine": SkyEye's own voice for this mission.
+	GCIVoice string `json:"gciVoice,omitempty"`
 }
 
 // Say asks SkyEye to speak a line on a frequency.
@@ -47,6 +53,8 @@ type Say struct {
 	Type      string `json:"type"`
 	Frequency string `json:"frequency"`
 	Text      string `json:"text"`
+	// Voice is "feminine" or "masculine"; empty uses SkyEye's own voice.
+	Voice string `json:"voice,omitempty"`
 }
 
 // Request is a package request SkyEye heard, sent to the mission.

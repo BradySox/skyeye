@@ -137,8 +137,9 @@ func (c *Client) BotsOnFrequency() int {
 }
 
 // IsOnFrequency checks if the named peer is on any of the client's frequencies.
+// Listen radios count: a player on a strike frequency still gets threat calls.
 func (c *Client) IsOnFrequency(name string) bool {
-	base := c.baseRadioInfo()
+	base := c.allRadioInfo()
 	c.clientsLock.RLock()
 	defer c.clientsLock.RUnlock()
 	for _, client := range c.clients {
