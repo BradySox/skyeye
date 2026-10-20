@@ -69,3 +69,25 @@ func TestLinkIgnoresGarbage(t *testing.T) {
 	link.handle([]byte(`{"type":"say","text":""}`), nil, Handlers{OnSay: func(Say) { called = true }})
 	require.False(t, called)
 }
+
+func TestLinkTuneAndEmitter(t *testing.T) {
+	t.Parallel()
+	link, err := Listen("127.0.0.1:0")
+	require.NoError(t, err)
+	var tune Tune
+	var emitter Emitter
+	handlers := Handlers{
+		OnTune:    func(m Tune) { tune = m },
+		OnEmitter: func(m Emitter) { emitter = m },
+	}
+	link.handle([]byte(`{"type":"tune","frequencies":["262.000AM"]}`), nil, handlers)
+	require.Equal(t, []string{"262.000AM"}, tune.Frequencies)
+	link.handle([]byte(`{"type":"emitter","frequencies":["262.000AM","264.500AM"],"callsign":"Vacuum","label":"SA-6","lat":42.1,"lon":43.2}`), nil, handlers)
+	require.Equal(t, Emitter{Type: TypeEmitter, Frequencies: []string{"262.000AM", "264.500AM"}, Callsign: "Vacuum", Label: "SA-6", Lat: 42.1, Lon: 43.2}, emitter)
+
+	called := false
+	ignore := Handlers{OnTune: func(Tune) { called = true }, OnEmitter: func(Emitter) { called = true }}
+	link.handle([]byte(`{"type":"tune","frequencies":[]}`), nil, ignore)
+	link.handle([]byte(`{"type":"emitter","frequencies":["262.000AM"],"label":""}`), nil, ignore)
+	require.False(t, called)
+}

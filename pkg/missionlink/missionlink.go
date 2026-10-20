@@ -22,6 +22,8 @@ const (
 	TypePackages = "packages"
 	TypeSay      = "say"
 	TypeRequest  = "request"
+	TypeTune     = "tune"
+	TypeEmitter  = "emitter"
 )
 
 // maxDatagram is the largest message accepted.
@@ -59,6 +61,28 @@ type Say struct {
 	Voice string `json:"voice,omitempty"`
 }
 
+// Tune asks SkyEye to join more frequencies to speak on, leaving the package controllers alone.
+type Tune struct {
+	Type        string   `json:"type"`
+	Frequencies []string `json:"frequencies"`
+}
+
+// Emitter asks SkyEye to report a radiating ground emitter with a bullseye call. SkyEye works out
+// the bullseye itself, so the bearing is magnetic and matches its own calls.
+type Emitter struct {
+	Type string `json:"type"`
+	// Frequencies to speak on, such as "262.000AM".
+	Frequencies []string `json:"frequencies"`
+	// Callsign of the speaker, such as "Vacuum".
+	Callsign string `json:"callsign"`
+	// Voice of the speaker; empty uses SkyEye's own voice.
+	Voice string `json:"voice,omitempty"`
+	// Label of the emitter as spoken, such as "SA-6".
+	Label string  `json:"label"`
+	Lat   float64 `json:"lat"`
+	Lon   float64 `json:"lon"`
+}
+
 // Request is a package request SkyEye heard, sent to the mission.
 type Request struct {
 	Type       string `json:"type"`
@@ -72,6 +96,8 @@ type Request struct {
 type Handlers struct {
 	OnPackages func(Packages)
 	OnSay      func(Say)
+	OnTune     func(Tune)
+	OnEmitter  func(Emitter)
 }
 
 // Link is the UDP link.
@@ -150,6 +176,24 @@ func (l *Link) handle(b []byte, from *net.UDPAddr, handlers Handlers) {
 		}
 		if handlers.OnSay != nil && say.Text != "" {
 			handlers.OnSay(say)
+		}
+	case TypeTune:
+		var tune Tune
+		if err := json.Unmarshal(b, &tune); err != nil {
+			log.Warn().Err(err).Msg("ignoring unreadable tune message")
+			return
+		}
+		if handlers.OnTune != nil && len(tune.Frequencies) > 0 {
+			handlers.OnTune(tune)
+		}
+	case TypeEmitter:
+		var emitter Emitter
+		if err := json.Unmarshal(b, &emitter); err != nil {
+			log.Warn().Err(err).Msg("ignoring unreadable emitter message")
+			return
+		}
+		if handlers.OnEmitter != nil && emitter.Label != "" && len(emitter.Frequencies) > 0 {
+			handlers.OnEmitter(emitter)
 		}
 	default:
 		log.Warn().Str("type", envelope.Type).Msg("ignoring unknown mission link message")

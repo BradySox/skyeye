@@ -14,6 +14,7 @@ import (
 	"github.com/dharmab/skyeye/pkg/synthesizer/voices"
 	"github.com/dharmab/skyeye/pkg/traces"
 	"github.com/lithammer/shortuuid/v3"
+	"github.com/paulmach/orb"
 	"github.com/rs/zerolog/log"
 )
 
@@ -198,6 +199,44 @@ func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[com
 	log.Info().Stringer("address", a.missionLink.Addr()).Msg("running mission link")
 	a.missionLink.Run(ctx, missionlink.Handlers{
 		OnPackages: a.applyPackages,
+		OnTune: func(tune missionlink.Tune) {
+			frequencies := make([]simpleradio.RadioFrequency, 0, len(tune.Frequencies))
+			for _, f := range tune.Frequencies {
+				frequency, err := simpleradio.ParseRadioFrequency(f)
+				if err != nil {
+					log.Warn().Err(err).Str("frequency", f).Msg("ignoring unreadable tune frequency")
+					continue
+				}
+				frequencies = append(frequencies, *frequency)
+			}
+			if err := a.srsClient.AddListenRadios(frequencies); err != nil {
+				log.Error().Err(err).Msg("failed to tune mission frequencies")
+			}
+		},
+		OnEmitter: func(emitter missionlink.Emitter) {
+			bullseye := a.radar.BullseyeOf(orb.Point{emitter.Lon, emitter.Lat})
+			c := a.currentComposer()
+			response := c.ComposeEmitter(emitter.Callsign, emitter.Label, bullseye)
+			for _, f := range emitter.Frequencies {
+				frequency, err := simpleradio.ParseRadioFrequency(f)
+				if err != nil {
+					log.Warn().Err(err).Str("frequency", f).Msg("ignoring emitter call with unreadable frequency")
+					continue
+				}
+				rCtx := traces.WithTraceID(traces.NewRequestContext(), shortuuid.New())
+				rCtx = withFrequency(traces.WithRequestText(rCtx, response.Subtitle), frequency)
+				if voice, ok := parseVoice(emitter.Voice); ok {
+					rCtx = withVoice(rCtx, voice)
+				}
+				select {
+				case out <- AsMessage(rCtx, response):
+				case <-ctx.Done():
+					return
+				case <-time.After(30 * time.Second):
+					log.Warn().Msg("dropped emitter call: speech queue is full")
+				}
+			}
+		},
 		OnSay: func(say missionlink.Say) {
 			frequency, err := simpleradio.ParseRadioFrequency(say.Frequency)
 			if err != nil {
