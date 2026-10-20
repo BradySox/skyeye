@@ -4,6 +4,7 @@ go 1.26.2
 
 require (
 	github.com/DCS-gRPC/go-bindings v0.7.1
+	github.com/adrg/xdg v0.4.0
 	github.com/amitybell/piper-asset v0.0.0-20231030194325-d36a29e3b1fd
 	github.com/amitybell/piper-voice-alan v0.0.0-20231118093148-059963c24dbd
 	github.com/amitybell/piper-voice-jenny v0.0.0-20231118093224-dcf0d49e46b7
@@ -57,7 +58,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/MirrexOne/unqueryvet v1.5.4 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.1 // indirect
-	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.24.1 // indirect
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect
 	github.com/alexkohler/nakedret/v2 v2.0.6 // indirect
