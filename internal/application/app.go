@@ -74,6 +74,8 @@ type Application struct {
 	voicePause time.Duration
 	// strike is the mission's strike frequency, set by the mission link
 	strike *simpleradio.RadioFrequency
+	// looseCalls lets a package call on strike name only the pilot, set by the mission link
+	looseCalls bool
 	// speakerLock prevents multiple instances from running the speaker at the same time
 	speakerLock *flock.Flock
 	// volume is the audio output volume level

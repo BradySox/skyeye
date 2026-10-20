@@ -75,3 +75,19 @@ func TestParserTakesANewCallsign(t *testing.T) {
 	require.IsType(t, &brevity.RadioCheckRequest{}, p.Parse("Chainsaw, Colt 1-1, radio check."))
 	require.Nil(t, p.Parse("Skyeye, Colt 1-1, radio check."))
 }
+
+func TestParseLoosePackageCall(t *testing.T) {
+	t.Parallel()
+	p := newPackageParser()
+	require.Equal(t,
+		&brevity.PackageRequest{Callsign: "colt 1 1", Controller: "darkstar", Kind: brevity.PackageCheckIn},
+		p.ParseLoosePackageCall("Colt 1-1, checking in."))
+	require.Equal(t,
+		&brevity.PackageRequest{Callsign: "colt 1 1", Controller: "darkstar", Kind: brevity.PackageReadyToPush},
+		p.ParseLoosePackageCall("Colt 1-1, ready to push."))
+	require.Equal(t,
+		&brevity.PackageRequest{Callsign: "colt 1 1", Controller: "darkstar", Kind: brevity.PackagePushTime},
+		p.ParseLoosePackageCall("Colt 1 1 say push time"))
+	require.Nil(t, p.ParseLoosePackageCall("nice shot Colt"))
+	require.Nil(t, New(TestCallsign, []string{}, true).ParseLoosePackageCall("Colt 1-1, ready to push."))
+}

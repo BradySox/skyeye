@@ -93,6 +93,52 @@ func New(callsign string, locations []string, enableTextLogging bool) *Parser {
 	}
 }
 
+// normalizeText lowercases and cleans a transcription the way Parse reads it.
+func (p *Parser) normalizeText(tx string) string {
+	tx = normalize.Normalize(tx)
+	for _, replacement := range replacements {
+		tx = strings.ReplaceAll(tx, replacement.Original, replacement.Normal)
+	}
+	if tx == "" {
+		return ""
+	}
+	return p.uncrushCallsign(tx)
+}
+
+// ParseLoosePackageCall reads a package call that names only the pilot, such as "Colt 1 1, ready to
+// push", for the first package controller. Only for text heard on the strike frequency when the
+// mission allows loose calls. Returns nil when it is not a package call.
+func (p *Parser) ParseLoosePackageCall(tx string) *brevity.PackageRequest {
+	p.packageControllersLock.RLock()
+	controller := ""
+	if len(p.packageControllers) > 0 {
+		controller = p.packageControllers[0]
+	}
+	p.packageControllersLock.RUnlock()
+	if controller == "" || len(tx) > maxInputLength {
+		return nil
+	}
+	tx = p.normalizeText(tx)
+	fields := strings.Fields(tx)
+	var before []string
+	request := (*brevity.PackageRequest)(nil)
+	if word, idx, ok := findRequestWord(fields); ok && word == push {
+		before = trimPushPreamble(fields[:idx])
+		request = parsePush("", controller, fields[idx+1:])
+	} else if i := strings.Index(tx, checkIn); i > 0 {
+		before = strings.Fields(tx[:i])
+		request = &brevity.PackageRequest{Controller: controller, Kind: brevity.PackageCheckIn}
+	} else {
+		return nil
+	}
+	pilot, ok := callsigns.ParsePilotCallsign(numwords.ParseString(strings.Join(before, " ")))
+	if !ok {
+		return nil
+	}
+	request.Callsign = pilot
+	return request
+}
+
 // Anyface is a brevity codeword that can be used in place of a GCI callsign.
 const Anyface string = "anyface"
 
@@ -254,14 +300,10 @@ func (p *Parser) Parse(tx string) any {
 		logger = logger.With().Str("text", tx).Logger()
 	}
 	logger.Debug().Msg("parsing text")
-	tx = normalize.Normalize(tx)
-	for _, replacement := range replacements {
-		tx = strings.ReplaceAll(tx, replacement.Original, replacement.Normal)
-	}
+	tx = p.normalizeText(tx)
 	if tx == "" {
 		return nil
 	}
-	tx = p.uncrushCallsign(tx)
 
 	if p.enableTextLogging {
 		logger = logger.With().Str("normalized", tx).Logger()

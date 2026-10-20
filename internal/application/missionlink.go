@@ -155,8 +155,21 @@ func (a *Application) strikeFrequency() (simpleradio.RadioFrequency, bool) {
 	return *a.strike, true
 }
 
+// heardOnLooseStrike is true for a transmission heard on strike when the mission allows loose calls.
+func (a *Application) heardOnLooseStrike(ctx context.Context) bool {
+	a.speakersLock.Lock()
+	loose := a.looseCalls
+	a.speakersLock.Unlock()
+	heard, ok := heardFrequencyFrom(ctx)
+	strike, isSet := a.strikeFrequency()
+	return loose && ok && isSet && heard.IsSameFrequency(strike)
+}
+
 func (a *Application) applyPackages(packages missionlink.Packages) {
 	a.parser.SetPackageControllers(packages.Controllers)
+	a.speakersLock.Lock()
+	a.looseCalls = packages.LooseCalls
+	a.speakersLock.Unlock()
 	frequencies := make([]simpleradio.RadioFrequency, 0, len(packages.Packages)+1)
 	if packages.Strike != "" {
 		strike, err := simpleradio.ParseRadioFrequency(packages.Strike)
