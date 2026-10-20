@@ -194,11 +194,44 @@ func (a *Application) applyPackages(packages missionlink.Packages) {
 	}
 }
 
+func (a *Application) applyATC(atc missionlink.ATC) {
+	var frequencies []simpleradio.RadioFrequency
+	for _, field := range atc.Fields {
+		for _, position := range field.Positions {
+			frequency, err := simpleradio.ParseRadioFrequency(position.Frequency)
+			if err != nil {
+				log.Warn().Err(err).Str("field", field.Name).Str("position", position.Position).Msg("ignoring ATC position with unreadable frequency")
+				continue
+			}
+			frequencies = append(frequencies, *frequency)
+		}
+	}
+	a.speakersLock.Lock()
+	a.atcFrequencies = frequencies
+	a.speakersLock.Unlock()
+	if err := a.srsClient.AddListenRadios(frequencies); err != nil {
+		log.Error().Err(err).Msg("failed to tune ATC frequencies")
+	}
+}
+
+// isATCFrequency is true if the frequency is one of the mission's airfield frequencies.
+func (a *Application) isATCFrequency(frequency simpleradio.RadioFrequency) bool {
+	a.speakersLock.Lock()
+	defer a.speakersLock.Unlock()
+	for _, f := range a.atcFrequencies {
+		if f.IsSameFrequency(frequency) {
+			return true
+		}
+	}
+	return false
+}
+
 // runMissionLink applies the mission's packages and speaks its lines.
 func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[composer.NaturalLanguageResponse]) {
 	log.Info().Stringer("address", a.missionLink.Addr()).Msg("running mission link")
 	a.missionLink.Run(ctx, missionlink.Handlers{
 		OnPackages: a.applyPackages,
+		OnATC:      a.applyATC,
 		OnTune: func(tune missionlink.Tune) {
 			frequencies := make([]simpleradio.RadioFrequency, 0, len(tune.Frequencies))
 			for _, f := range tune.Frequencies {
@@ -274,5 +307,26 @@ func (a *Application) handlePackageRequest(ctx context.Context, request *brevity
 	}
 	if err := a.missionLink.Send(message); err != nil {
 		log.Warn().Err(err).Msg("failed to pass package request to the mission")
+	}
+}
+
+// handleATCRequest passes an ATC call to the mission, which answers with a say message.
+func (a *Application) handleATCRequest(ctx context.Context, request *brevity.ATCRequest) {
+	if a.missionLink == nil {
+		return
+	}
+	message := missionlink.ATCRequest{
+		Kind:     string(request.Kind),
+		Callsign: request.Callsign,
+		Position: request.Position,
+		Detail:   request.Detail,
+		Numbers:  strings.Join(request.Numbers, " "),
+		Text:     request.Text,
+	}
+	if frequency, ok := heardFrequencyFrom(ctx); ok {
+		message.Frequency = frequency.String()
+	}
+	if err := a.missionLink.SendATC(message); err != nil {
+		log.Warn().Err(err).Msg("failed to pass ATC call to the mission")
 	}
 }

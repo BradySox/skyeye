@@ -1,9 +1,11 @@
 // Package missionlink is a local UDP link between SkyEye and a mission script running a package
 // controller (for example, DCS Retribution's RetLab package controller).
 //
-// The mission sends SkyEye its packages (frequencies and controller callsigns) and lines to speak.
-// SkyEye sends the mission the package requests it heard. Messages are one JSON object per UDP
-// datagram. SkyEye replies to the address the last packages message came from.
+// The mission sends SkyEye its packages (frequencies and controller callsigns), its airfield
+// controllers and lines to speak. SkyEye sends the mission the requests it heard. Messages are one
+// JSON object per UDP datagram. Several mission scripts may share the link, each from its own
+// socket: package requests go to the address the last packages message came from, ATC requests to
+// the address the last atc message came from.
 package missionlink
 
 import (
@@ -24,6 +26,9 @@ const (
 	TypeRequest  = "request"
 	TypeTune     = "tune"
 	TypeEmitter  = "emitter"
+	TypeATC      = "atc"
+	// TypeATCRequest is an ATC call SkyEye heard, sent to the mission.
+	TypeATCRequest = "atcRequest"
 )
 
 // maxDatagram is the largest message accepted.
@@ -83,6 +88,40 @@ type Emitter struct {
 	Lon   float64 `json:"lon"`
 }
 
+// ATCPosition is one controller position at an airfield.
+type ATCPosition struct {
+	// Position is "ground", "tower", "departure", "approach", "arrival" or "emergency".
+	Position string `json:"position"`
+	// Frequency the position talks on, such as "270.450AM".
+	Frequency string `json:"frequency"`
+}
+
+// ATCField is an airfield the mission runs ATC for.
+type ATCField struct {
+	Name      string        `json:"name"`
+	Positions []ATCPosition `json:"positions"`
+}
+
+// ATC tells SkyEye the airfield frequencies to listen on. Every call heard on one is parsed as an
+// ATC call and passed to the mission, which answers with say messages.
+type ATC struct {
+	Type   string     `json:"type"`
+	Fields []ATCField `json:"fields"`
+}
+
+// ATCRequest is an ATC call SkyEye heard, sent to the mission. Numbers is space-separated, so the
+// mission script can read every field as a flat string.
+type ATCRequest struct {
+	Type      string `json:"type"`
+	Kind      string `json:"kind"`
+	Callsign  string `json:"callsign"`
+	Position  string `json:"position,omitempty"`
+	Detail    string `json:"detail,omitempty"`
+	Numbers   string `json:"numbers"`
+	Text      string `json:"text"`
+	Frequency string `json:"frequency"`
+}
+
 // Request is a package request SkyEye heard, sent to the mission.
 type Request struct {
 	Type       string `json:"type"`
@@ -98,12 +137,14 @@ type Handlers struct {
 	OnSay      func(Say)
 	OnTune     func(Tune)
 	OnEmitter  func(Emitter)
+	OnATC      func(ATC)
 }
 
 // Link is the UDP link.
 type Link struct {
-	conn     *net.UDPConn
-	peer     *net.UDPAddr
+	conn *net.UDPConn
+	// peers are the mission scripts by the message type they announce with.
+	peers    map[string]*net.UDPAddr
 	peerLock sync.RWMutex
 }
 
@@ -117,7 +158,7 @@ func Listen(address string) (*Link, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on mission link address %q: %w", address, err)
 	}
-	return &Link{conn: conn}, nil
+	return &Link{conn: conn, peers: map[string]*net.UDPAddr{}}, nil
 }
 
 // Addr is the address the link listens on.
@@ -161,9 +202,7 @@ func (l *Link) handle(b []byte, from *net.UDPAddr, handlers Handlers) {
 			log.Warn().Err(err).Msg("ignoring unreadable packages message")
 			return
 		}
-		l.peerLock.Lock()
-		l.peer = from
-		l.peerLock.Unlock()
+		l.setPeer(TypePackages, from)
 		log.Info().Int("packages", len(packages.Packages)).Strs("controllers", packages.Controllers).Msg("received packages from mission")
 		if handlers.OnPackages != nil {
 			handlers.OnPackages(packages)
@@ -195,21 +234,35 @@ func (l *Link) handle(b []byte, from *net.UDPAddr, handlers Handlers) {
 		if handlers.OnEmitter != nil && emitter.Label != "" && len(emitter.Frequencies) > 0 {
 			handlers.OnEmitter(emitter)
 		}
+	case TypeATC:
+		var atc ATC
+		if err := json.Unmarshal(b, &atc); err != nil {
+			log.Warn().Err(err).Msg("ignoring unreadable atc message")
+			return
+		}
+		l.setPeer(TypeATC, from)
+		if handlers.OnATC != nil {
+			handlers.OnATC(atc)
+		}
 	default:
 		log.Warn().Str("type", envelope.Type).Msg("ignoring unknown mission link message")
 	}
 }
 
-// Send sends a request to the mission. It fails if no packages message has arrived yet.
-func (l *Link) Send(request Request) error {
+func (l *Link) setPeer(owner string, from *net.UDPAddr) {
+	l.peerLock.Lock()
+	defer l.peerLock.Unlock()
+	l.peers[owner] = from
+}
+
+func (l *Link) sendTo(owner string, message any) error {
 	l.peerLock.RLock()
-	peer := l.peer
+	peer := l.peers[owner]
 	l.peerLock.RUnlock()
 	if peer == nil {
-		return errors.New("no mission has connected to the mission link")
+		return fmt.Errorf("no mission has sent a %s message to the mission link", owner)
 	}
-	request.Type = TypeRequest
-	b, err := json.Marshal(request)
+	b, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to encode request: %w", err)
 	}
@@ -217,4 +270,16 @@ func (l *Link) Send(request Request) error {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
 	return nil
+}
+
+// Send sends a package request to the mission. It fails if no packages message has arrived yet.
+func (l *Link) Send(request Request) error {
+	request.Type = TypeRequest
+	return l.sendTo(TypePackages, request)
+}
+
+// SendATC sends an ATC request to the mission. It fails if no atc message has arrived yet.
+func (l *Link) SendATC(request ATCRequest) error {
+	request.Type = TypeATCRequest
+	return l.sendTo(TypeATC, request)
 }
