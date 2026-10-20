@@ -36,6 +36,9 @@ var atcCallsignHomophones = map[string]string{
 	"free": "3", "tree": "3", "ate": "8",
 }
 
+// distanceWords follow a distance, which is never part of a callsign.
+var distanceWords = map[string]bool{"mile": true, "miles": true, "out": true}
+
 // decimalMark is the token for a decimal point in a spoken frequency.
 const decimalMark = "."
 
@@ -116,6 +119,10 @@ func callsignSpan(tokens []string, start int) (string, int, bool) {
 			t = d
 		}
 		if !isDigitToken(t) {
+			break
+		}
+		// "Viper 1, 5 miles": a flight callsign without the ship number, then a distance.
+		if len(digits) > 0 && i+1 < len(tokens) && distanceWords[tokens[i+1]] {
 			break
 		}
 		digits = append(digits, t)

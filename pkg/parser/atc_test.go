@@ -49,6 +49,13 @@ func TestParseATC(t *testing.T) {
 			},
 		},
 		{
+			text: "Kobuleti Tower, Viper 1, 5 miles, full stop",
+			expected: &brevity.ATCRequest{
+				Callsign: "viper 1", Position: positionTower, Kind: brevity.ATCInbound, Numbers: []string{"5"},
+				Text: "kobuleti tower viper 1 5 miles full stop",
+			},
+		},
+		{
 			text: "Kobuleti Tower, Viper 1-1, clear of the runway.",
 			expected: &brevity.ATCRequest{
 				Callsign: "viper 1 1", Position: positionTower, Kind: brevity.ATCClear,
