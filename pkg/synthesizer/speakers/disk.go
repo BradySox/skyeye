@@ -129,7 +129,8 @@ func (s *diskSynth) SayContext(ctx context.Context, text string) ([]float32, err
 	if s.speed != 1.0 {
 		args = append(args, "--length_scale", fmt.Sprintf("%f", s.speed))
 	}
-	cmd := exec.CommandContext(ctx, s.exe, args...)
+	// The binary is the one Piper installs and the model paths come from SkyEye's own voices folder.
+	cmd := exec.CommandContext(ctx, s.exe, args...) //nolint:gosec
 	cmd.Dir = filepath.Dir(s.exe)
 	cmd.Stdin = strings.NewReader(text)
 	stderr := bytes.NewBuffer(nil)
