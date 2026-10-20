@@ -23,6 +23,9 @@ func (a *Application) recognize(ctx context.Context, out chan<- Message[string])
 			rCtx = traces.WithTraceID(rCtx, transmission.TraceID)
 			rCtx = traces.WithClientName(rCtx, transmission.ClientName)
 			rCtx = traces.WithReceivedAt(rCtx, time.Now())
+			if f := transmission.Frequency; f != nil && a.srsClient.IsListenFrequency(*f) {
+				rCtx = withFrequency(rCtx, f)
+			}
 			a.recognizeSample(ctx, rCtx, transmission.Audio, out)
 		}
 	}

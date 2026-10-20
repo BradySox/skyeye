@@ -125,6 +125,7 @@ func (c *Client) receiveVoice(ctx context.Context, in <-chan []byte, out chan<- 
 				}
 			}
 
+			c.radioLock.RLock()
 			for radio, receiver := range c.receivers {
 				for _, frequency := range packet.Frequencies {
 					testRadio := types.Radio{
@@ -137,9 +138,11 @@ func (c *Client) receiveVoice(ctx context.Context, in <-chan []byte, out chan<- 
 					}
 				}
 			}
+			c.radioLock.RUnlock()
 		case <-t.C:
 			// Check if everyone has stopped talking.
 			if len(in) == 0 {
+				c.radioLock.RLock()
 				for _, receiver := range c.receivers {
 					if receiver.hasTransmission() {
 						duration := time.Duration(len(receiver.buffer)) * frameLength
@@ -158,6 +161,7 @@ func (c *Client) receiveVoice(ctx context.Context, in <-chan []byte, out chan<- 
 						receiver.reset()
 					}
 				}
+				c.radioLock.RUnlock()
 			}
 		case <-ctx.Done():
 			log.Info().Msg("stopping SRS audio receiver due to context cancellation")

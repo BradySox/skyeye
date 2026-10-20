@@ -44,6 +44,7 @@ func (c *Client) waitForClearChannel() {
 	for {
 		isReceiving := false
 		deadline := time.Now()
+		c.radioLock.RLock()
 		for _, receiver := range c.receivers {
 			if receiver.isReceivingTransmission() {
 				isReceiving = true
@@ -52,6 +53,7 @@ func (c *Client) waitForClearChannel() {
 				}
 			}
 		}
+		c.radioLock.RUnlock()
 		if !isReceiving {
 			return
 		}

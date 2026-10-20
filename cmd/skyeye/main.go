@@ -52,6 +52,7 @@ var (
 	enableGRPC                   bool
 	grpcAddress                  string
 	grpcAPIKey                   string
+	missionLinkAddress           string
 	controllerCallsign           string
 	controllerCallsigns          []string
 	coalitionName                string
@@ -119,6 +120,9 @@ func init() {
 	skyeye.Flags().BoolVar(&enableGRPC, "enable-grpc", false, "Enable DCS-gRPC features")
 	skyeye.Flags().StringVar(&grpcAddress, "grpc-address", "localhost:50051", "Address of the DCS-gRPC server")
 	skyeye.Flags().StringVar(&grpcAPIKey, "grpc-api-key", "", "API key for DCS-gRPC authentication")
+
+	// Mission link
+	skyeye.Flags().StringVar(&missionLinkAddress, "mission-link-address", "", "Local UDP address for a mission script running a package controller, e.g. 127.0.0.1:42690. Empty disables it")
 
 	// Identity
 	skyeye.Flags().StringVar(&controllerCallsign, "callsign", "", "GCI callsign used in radio transmissions. Automatically chosen if not provided")
@@ -474,6 +478,7 @@ func run(_ *cobra.Command, _ []string) {
 		EnableGRPC:                   enableGRPC,
 		GRPCAddress:                  grpcAddress,
 		GRPCAPIKey:                   grpcAPIKey,
+		MissionLinkAddress:           missionLinkAddress,
 		EnableTerrainDetection:       enableTerrainDetection,
 		Locations:                    locs,
 		CustomAircraft:               customAircraft,

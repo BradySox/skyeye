@@ -18,6 +18,7 @@ import (
 	"github.com/dharmab/skyeye/pkg/composer"
 	"github.com/dharmab/skyeye/pkg/controller"
 	"github.com/dharmab/skyeye/pkg/encyclopedia"
+	"github.com/dharmab/skyeye/pkg/missionlink"
 	"github.com/dharmab/skyeye/pkg/parser"
 	"github.com/dharmab/skyeye/pkg/radar"
 	"github.com/dharmab/skyeye/pkg/recognizer"
@@ -50,6 +51,8 @@ type Application struct {
 	chatListener *commands.ChatListener
 	// parser converts English brevity text to internal representations
 	parser *parser.Parser
+	// missionLink talks to a mission script running a package controller, if enabled
+	missionLink *missionlink.Link
 	// radar tracks contacts and provides geometric computations
 	radar *radar.Radar
 	// controller publishes responses and calls
@@ -235,8 +238,18 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		}
 	}
 
+	var link *missionlink.Link
+	if config.MissionLinkAddress != "" {
+		log.Info().Str("address", config.MissionLinkAddress).Msg("constructing mission link")
+		link, err = missionlink.Listen(config.MissionLinkAddress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct application: %w", err)
+		}
+	}
+
 	log.Info().Msg("constructing application")
 	app := &Application{
+		missionLink:                link,
 		callsign:                   config.Callsign,
 		enableTranscriptionLogging: config.EnableTranscriptionLogging,
 		chatListener:               chatListener,
@@ -335,6 +348,13 @@ func (a *Application) Run(ctx context.Context, cancel context.CancelFunc, wg *sy
 					rxTextChan <- Message[string]{Context: rCtx, Data: request.Text}
 				}
 			}
+		})
+	}
+
+	if a.missionLink != nil {
+		log.Info().Msg("starting mission link routine")
+		wg.Go(func() {
+			a.runMissionLink(ctx, txTextChan)
 		})
 	}
 

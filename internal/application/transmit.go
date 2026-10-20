@@ -29,6 +29,9 @@ func (a *Application) transmitMessage(rCtx context.Context, audio simpleradio.Au
 		ClientName: traces.GetClientName(rCtx),
 		Audio:      audio,
 	}
+	if frequency, ok := frequencyFrom(rCtx); ok {
+		transmission.Frequencies = []simpleradio.RadioFrequency{frequency}
+	}
 
 	log.Info().Str("traceID", transmission.TraceID).Msg("transmitting audio")
 	a.srsClient.Transmit(transmission)

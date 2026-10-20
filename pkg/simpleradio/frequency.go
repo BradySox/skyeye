@@ -80,24 +80,22 @@ func (f RadioFrequency) String() string {
 
 // Frequencies returns the frequencies the client is listening on.
 func (c *Client) Frequencies() []RadioFrequency {
-	frequencies := make([]RadioFrequency, 0, len(c.clientInfo.RadioInfo.Radios))
-	for _, radio := range c.clientInfo.RadioInfo.Radios {
-		frequency := RadioFrequency{
-			Frequency:  unit.Frequency(radio.Frequency) * unit.Hertz,
-			Modulation: radio.Modulation,
-		}
-		frequencies = append(frequencies, frequency)
+	radios := c.baseRadioInfo().Radios
+	frequencies := make([]RadioFrequency, 0, len(radios))
+	for _, radio := range radios {
+		frequencies = append(frequencies, toFrequency(radio))
 	}
 	return frequencies
 }
 
 // ClientsOnFrequency returns the number of peers on the client's frequencies.
 func (c *Client) ClientsOnFrequency() int {
+	base := c.baseRadioInfo()
 	c.clientsLock.RLock()
 	defer c.clientsLock.RUnlock()
 	count := 0
 	for _, client := range c.clients {
-		if ok := c.clientInfo.RadioInfo.IsOnFrequency(client.RadioInfo); ok {
+		if ok := base.IsOnFrequency(client.RadioInfo); ok {
 			count++
 		}
 	}
@@ -111,11 +109,12 @@ func isBot(client types.ClientInfo) bool {
 // HumansOnFrequency returns the number of human peers on the client's frequencies.
 // A human peer is any client whose name does not end with "[BOT]".
 func (c *Client) HumansOnFrequency() int {
+	base := c.baseRadioInfo()
 	c.clientsLock.RLock()
 	defer c.clientsLock.RUnlock()
 	count := 0
 	for _, client := range c.clients {
-		if ok := c.clientInfo.RadioInfo.IsOnFrequency(client.RadioInfo); ok && !isBot(client) {
+		if ok := base.IsOnFrequency(client.RadioInfo); ok && !isBot(client) {
 			count++
 		}
 	}
@@ -125,11 +124,12 @@ func (c *Client) HumansOnFrequency() int {
 // BotsOnFrequency returns the number of bot peers on the client's frequencies.
 // A bot peer is any client whose name ends with "[BOT]".
 func (c *Client) BotsOnFrequency() int {
+	base := c.baseRadioInfo()
 	c.clientsLock.RLock()
 	defer c.clientsLock.RUnlock()
 	count := 0
 	for _, client := range c.clients {
-		if ok := c.clientInfo.RadioInfo.IsOnFrequency(client.RadioInfo); ok && isBot(client) {
+		if ok := base.IsOnFrequency(client.RadioInfo); ok && isBot(client) {
 			count++
 		}
 	}
@@ -138,11 +138,12 @@ func (c *Client) BotsOnFrequency() int {
 
 // IsOnFrequency checks if the named peer is on any of the client's frequencies.
 func (c *Client) IsOnFrequency(name string) bool {
+	base := c.baseRadioInfo()
 	c.clientsLock.RLock()
 	defer c.clientsLock.RUnlock()
 	for _, client := range c.clients {
 		if client.Name == name {
-			if ok := c.clientInfo.RadioInfo.IsOnFrequency(client.RadioInfo); ok {
+			if ok := base.IsOnFrequency(client.RadioInfo); ok {
 				return true
 			}
 		}
