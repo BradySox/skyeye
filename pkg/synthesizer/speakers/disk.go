@@ -49,6 +49,10 @@ type voiceConfig struct {
 // model, such as "en_US-l2arctic-medium#ABA". A folder with a voices.bin is a Kokoro model, and
 // "kokoro#am_eric" speaks with its am_eric voice.
 func NewDiskSpeaker(voicesDir, name string, playbackSpeed float64, playbackPause time.Duration) (Speaker, error) {
+	// The voice tools run in their own folder, so a relative voices dir would miss.
+	if abs, err := filepath.Abs(voicesDir); err == nil {
+		voicesDir = abs
+	}
 	folder, speakerName, _ := strings.Cut(name, "#")
 	dir := filepath.Join(voicesDir, folder)
 	if _, err := os.Stat(filepath.Join(dir, "voices.bin")); err == nil {
