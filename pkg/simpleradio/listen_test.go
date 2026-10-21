@@ -90,7 +90,7 @@ func TestAddListenRadiosResyncsWithServer(t *testing.T) {
 	require.NoError(t, c.AddListenRadios([]RadioFrequency{testPackageFrequency}))
 
 	reader := bufio.NewReader(server)
-	var sent []types.MessageType
+	sent := make([]types.MessageType, 0, 2)
 	for range 2 {
 		line, readErr := reader.ReadBytes('\n')
 		require.NoError(t, readErr)
