@@ -27,7 +27,9 @@ func toFrequency(r types.Radio) RadioFrequency {
 
 // AddListenRadios tunes extra radios the client hears on. Calls heard on them reach Receive like any
 // other, but the client transmits on them only when a Transmission names them in Frequencies.
-// Frequencies the client already has are skipped. The SRS server is sent the new radio list.
+// Frequencies the client already has are skipped. The SRS server is sent the new radio list with a
+// sync and the External AWACS Mode login: an SRS server ignores a radio update from an EAM client,
+// so a radio added after connecting would never get any audio routed to it.
 func (c *Client) AddListenRadios(frequencies []RadioFrequency) error {
 	added := 0
 	func() {
@@ -55,10 +57,19 @@ func (c *Client) AddListenRadios(frequencies []RadioFrequency) error {
 		return nil
 	}
 	log.Info().Int("count", added).Msg("tuned listen radios")
-	if err := c.updateRadios(); err != nil {
+	if err := c.resyncRadios(); err != nil {
 		return fmt.Errorf("failed to send listen radios: %w", err)
 	}
 	return nil
+}
+
+// resyncRadios sends the client's full radio list to the SRS server the way a fresh connection
+// does: a sync, then the External AWACS Mode login, both carrying every radio.
+func (c *Client) resyncRadios() error {
+	if err := c.sync(); err != nil {
+		return err
+	}
+	return c.connectExternalAWACSMode()
 }
 
 // baseRadioInfo is a copy of the client's radio info holding only the configured frequencies.
