@@ -123,7 +123,7 @@ func TestLinkRoutesRepliesByOwner(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("no packages message")
 	}
-	_, err = atc.WriteToUDP([]byte(`{"type":"atc","fields":[{"name":"Kobuleti","positions":[{"position":"ground","frequency":"260.000AM"},{"position":"tower","frequency":"262.000AM"}]}]}`), skyeye)
+	_, err = atc.WriteToUDP([]byte(`{"type":"atc","fields":[{"name":"Kobuleti","positions":[{"position":"ground","frequency":"260.000AM"},{"position":"tower","frequency":"262.000AM"}]}],"callsigns":["Uzi 2","Colt 1"]}`), skyeye)
 	require.NoError(t, err)
 	select {
 	case a := <-atcCh:
@@ -131,6 +131,7 @@ func TestLinkRoutesRepliesByOwner(t *testing.T) {
 			{Position: "ground", Frequency: "260.000AM"},
 			{Position: "tower", Frequency: "262.000AM"},
 		}}}, a.Fields)
+		require.Equal(t, []string{"Uzi 2", "Colt 1"}, a.Callsigns)
 	case <-time.After(2 * time.Second):
 		t.Fatal("no atc message")
 	}

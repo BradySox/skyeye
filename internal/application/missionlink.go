@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -220,6 +221,16 @@ func (a *Application) applyPackages(packages missionlink.Packages) {
 	if err := a.srsClient.AddListenRadios(frequencies); err != nil {
 		log.Error().Err(err).Msg("failed to tune package frequencies")
 	}
+	callsigns := slices.Clone(packages.Controllers)
+	for _, pkg := range packages.Packages {
+		callsigns = append(callsigns, pkg.Name)
+	}
+	a.updateVocabulary(func(v *missionVocabulary) {
+		if packages.GCICallsign != "" {
+			v.gciCallsign = packages.GCICallsign
+		}
+		v.packageCallsigns = callsigns
+	})
 }
 
 func (a *Application) applyATC(atc missionlink.ATC) {
@@ -241,6 +252,14 @@ func (a *Application) applyATC(atc missionlink.ATC) {
 	if err := a.srsClient.AddListenRadios(frequencies); err != nil {
 		log.Error().Err(err).Msg("failed to tune ATC frequencies")
 	}
+	fields := make([]string, 0, len(atc.Fields))
+	for _, field := range atc.Fields {
+		fields = append(fields, field.Name)
+	}
+	a.updateVocabulary(func(v *missionVocabulary) {
+		v.fields = fields
+		v.atcCallsigns = slices.Clone(atc.Callsigns)
+	})
 }
 
 // isATCFrequency is true if the frequency is one of the mission's airfield frequencies. loose is
@@ -277,6 +296,7 @@ func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[com
 			}
 		},
 		OnEmitter: func(emitter missionlink.Emitter) {
+			a.addSpeakerVocabulary(emitter.Callsign)
 			bullseye := a.radar.BullseyeOf(orb.Point{emitter.Lon, emitter.Lat})
 			c := a.currentComposer()
 			response := c.ComposeEmitter(emitter.Callsign, emitter.Label, bullseye)

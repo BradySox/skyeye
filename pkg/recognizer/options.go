@@ -2,6 +2,7 @@ package recognizer
 
 type recognizerOptions struct {
 	locations []string
+	threads   uint
 }
 
 // Option configures a recognizer.
@@ -12,5 +13,12 @@ type Option func(*recognizerOptions)
 func WithLocations(locations []string) Option {
 	return func(o *recognizerOptions) {
 		o.locations = locations
+	}
+}
+
+// WithThreads sets the CPU threads a local recognizer uses. Zero keeps the library's default.
+func WithThreads(threads uint) Option {
+	return func(o *recognizerOptions) {
+		o.threads = threads
 	}
 }

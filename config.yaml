@@ -51,6 +51,11 @@
 # speech recognition quality.
 #whisper-model: ggml-tiny.en.bin
 #
+# CPU threads for local speech recognition. The default is 8, or fewer on a
+# machine with fewer logical CPUs. Using every thread on a desktop that is also
+# running DCS makes recognition slower, not faster.
+#whisper-threads: 8
+#
 # If you chose the OpenAI API for cloud-based speech recognition, you need to
 # provide an API key. You can get an API key at https://openai.com/api.
 #openai-api-key: apikeygoeshere

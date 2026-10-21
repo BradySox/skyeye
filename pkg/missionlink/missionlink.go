@@ -119,6 +119,9 @@ type ATC struct {
 	// Discipline is the mission's radio discipline: "strict", "relaxed" or "casual". Casual
 	// parses calls loosely.
 	Discipline string `json:"discipline,omitempty"`
+	// Callsigns are the flights the mission runs ATC for, such as "Uzi 2". SkyEye only uses them
+	// to steer speech recognition toward them.
+	Callsigns []string `json:"callsigns,omitempty"`
 }
 
 // ATCRequest is an ATC call SkyEye heard, sent to the mission. Numbers is space-separated, so the
