@@ -75,7 +75,7 @@ func (a *Application) composeCall(ctx context.Context, call any, out chan<- Mess
 	}
 
 	logger.Info().Str("speech", response.Speech).Str("subtitle", response.Subtitle).Msg("composed brevity call")
-	if isImportantCall(call) {
+	if a.isImportantCall(call) {
 		ctx = withImportant(ctx)
 	}
 	ctx = traces.WithCallText(ctx, response.Subtitle)

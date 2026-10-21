@@ -74,12 +74,26 @@ func voiceFrom(ctx context.Context) (string, bool) {
 
 // isImportantCall is true for calls a pilot on the strike frequency must hear. Everything else
 // SkyEye broadcasts stays off strike, so the GCI does not step on the package traffic.
-func isImportantCall(call any) bool {
+func (a *Application) isImportantCall(call any) bool {
+	a.speakersLock.Lock()
+	threatsOnly := a.strikeThreatsOnly
+	a.speakersLock.Unlock()
 	switch call.(type) {
-	case brevity.ThreatCall, brevity.MergedCall:
+	case brevity.ThreatCall:
 		return true
+	case brevity.MergedCall:
+		return !threatsOnly
 	}
 	return false
+}
+
+// answersOnStrike is false when the mission keeps the GCI on strike to threat calls.
+func (a *Application) answersOnStrike(heard *simpleradio.RadioFrequency) bool {
+	a.speakersLock.Lock()
+	threatsOnly := a.strikeThreatsOnly
+	a.speakersLock.Unlock()
+	strike, ok := a.strikeFrequency()
+	return !threatsOnly || !ok || heard == nil || !heard.IsSameFrequency(strike)
 }
 
 // Voice names: "feminine" and "masculine" are the built-in voices; anything else is a Piper voice
@@ -155,8 +169,22 @@ func (a *Application) strikeFrequency() (simpleradio.RadioFrequency, bool) {
 	return *a.strike, true
 }
 
+// heardOnLooseStrike is true for a transmission heard on strike when the mission allows loose calls.
+func (a *Application) heardOnLooseStrike(ctx context.Context) bool {
+	a.speakersLock.Lock()
+	loose := a.looseCalls
+	a.speakersLock.Unlock()
+	heard, ok := heardFrequencyFrom(ctx)
+	strike, isSet := a.strikeFrequency()
+	return loose && ok && isSet && heard.IsSameFrequency(strike)
+}
+
 func (a *Application) applyPackages(packages missionlink.Packages) {
 	a.parser.SetPackageControllers(packages.Controllers)
+	a.speakersLock.Lock()
+	a.looseCalls = packages.LooseCalls
+	a.strikeThreatsOnly = packages.StrikeThreatsOnly
+	a.speakersLock.Unlock()
 	frequencies := make([]simpleradio.RadioFrequency, 0, len(packages.Packages)+1)
 	if packages.Strike != "" {
 		strike, err := simpleradio.ParseRadioFrequency(packages.Strike)

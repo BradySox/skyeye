@@ -41,6 +41,11 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 		}
 	} else {
 		request = a.parser.Parse(text)
+		if request == nil && a.heardOnLooseStrike(ctx) {
+			if looseCall := a.parser.ParseLoosePackageCall(text); looseCall != nil {
+				request = looseCall
+			}
+		}
 	}
 	ctx = traces.WithParsedAt(ctx, time.Now())
 	if request != nil {

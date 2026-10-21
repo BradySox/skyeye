@@ -55,6 +55,12 @@ type Packages struct {
 	GCIVoice string `json:"gciVoice,omitempty"`
 	// GCICallsign is SkyEye's own callsign for this mission, such as "Chainsaw".
 	GCICallsign string `json:"gciCallsign,omitempty"`
+	// LooseCalls lets a package call on the strike frequency name only the pilot, for squadrons
+	// that do not fly by the book.
+	LooseCalls bool `json:"looseCalls,omitempty"`
+	// StrikeThreatsOnly keeps the GCI on strike to threat calls: no merges, and answers to calls
+	// heard on strike go out on the GCI's own frequencies.
+	StrikeThreatsOnly bool `json:"strikeThreatsOnly,omitempty"`
 }
 
 // Say asks SkyEye to speak a line on a frequency.
