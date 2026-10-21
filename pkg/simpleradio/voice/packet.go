@@ -217,8 +217,10 @@ func Decode(b []byte) (packet *Packet, err error) {
 	if int(packetLength) != len(b) {
 		return nil, fmt.Errorf("packet length header %d does not match datagram length %d", packetLength, len(b))
 	}
+	// The fixed segment's fields are 57 bytes. SkyEye's own encoder (and older SRS) pads it to 58,
+	// but SRS 2.4 clients send exactly 57; both decode the same, working back from the end.
 	segmentsLength := headerSegmentLength + int(audioSegmentLength) + int(frequenciesSegmentLength) + fixedSegmentLength
-	if segmentsLength != int(packetLength) {
+	if segmentsLength != int(packetLength) && segmentsLength-1 != int(packetLength) {
 		return nil, fmt.Errorf("length of packet segments %d does not match packet length header %d", segmentsLength, packetLength)
 	}
 	if frequenciesSegmentLength%frequencyLength != 0 {
