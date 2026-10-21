@@ -2,7 +2,9 @@
 package parser
 
 import (
+	"slices"
 	"strings"
+	"sync"
 
 	"github.com/dharmab/numwords"
 	"github.com/dharmab/skyeye/internal/normalize"
@@ -31,6 +33,52 @@ type Parser struct {
 	// vectorLocations is the configured locations plus the tanker alias,
 	// precomputed so parseVector does not mutate a shared slice.
 	vectorLocations []string
+	// packageControllers are extra callsigns, such as an AWACS running a strike package, whose
+	// calls are passed to the mission as PackageRequests. Set at runtime by the mission link.
+	packageControllers     []string
+	packageControllersLock sync.RWMutex
+}
+
+// SetPackageControllers replaces the package controller callsigns the parser listens for.
+func (p *Parser) SetPackageControllers(controllers []string) {
+	normalized := make([]string, 0, len(controllers))
+	for _, callsign := range controllers {
+		if c := strings.ToLower(strings.ReplaceAll(callsign, " ", "")); c != "" {
+			normalized = append(normalized, c)
+		}
+	}
+	p.packageControllersLock.Lock()
+	defer p.packageControllersLock.Unlock()
+	p.packageControllers = normalized
+}
+
+// SetCallsign replaces the GCI callsign, for a mission that names the AWACS itself.
+func (p *Parser) SetCallsign(callsign string) {
+	p.packageControllersLock.Lock()
+	defer p.packageControllersLock.Unlock()
+	p.controllerCallsign = strings.ReplaceAll(callsign, " ", "")
+}
+
+func (p *Parser) callsign() string {
+	p.packageControllersLock.RLock()
+	defer p.packageControllersLock.RUnlock()
+	return p.controllerCallsign
+}
+
+// wakePhrases is the GCI callsign, ANYFACE, then any package controller callsigns.
+func (p *Parser) wakePhrases() []string {
+	p.packageControllersLock.RLock()
+	defer p.packageControllersLock.RUnlock()
+	phrases := make([]string, 0, 2+len(p.packageControllers))
+	phrases = append(phrases, p.controllerCallsign, Anyface)
+	return append(phrases, p.packageControllers...)
+}
+
+// isPackageController is true if the wake phrase is a package controller callsign.
+func (p *Parser) isPackageController(phrase string) bool {
+	p.packageControllersLock.RLock()
+	defer p.packageControllersLock.RUnlock()
+	return slices.Contains(p.packageControllers, phrase)
 }
 
 // New creates a new parser.
@@ -43,6 +91,52 @@ func New(callsign string, locations []string, enableTextLogging bool) *Parser {
 		enableTextLogging:  enableTextLogging,
 		vectorLocations:    vectorLocations,
 	}
+}
+
+// normalizeText lowercases and cleans a transcription the way Parse reads it.
+func (p *Parser) normalizeText(tx string) string {
+	tx = normalize.Normalize(tx)
+	for _, replacement := range replacements {
+		tx = strings.ReplaceAll(tx, replacement.Original, replacement.Normal)
+	}
+	if tx == "" {
+		return ""
+	}
+	return p.uncrushCallsign(tx)
+}
+
+// ParseLoosePackageCall reads a package call that names only the pilot, such as "Colt 1 1, ready to
+// push", for the first package controller. Only for text heard on the strike frequency when the
+// mission allows loose calls. Returns nil when it is not a package call.
+func (p *Parser) ParseLoosePackageCall(tx string) *brevity.PackageRequest {
+	p.packageControllersLock.RLock()
+	controller := ""
+	if len(p.packageControllers) > 0 {
+		controller = p.packageControllers[0]
+	}
+	p.packageControllersLock.RUnlock()
+	if controller == "" || len(tx) > maxInputLength {
+		return nil
+	}
+	tx = p.normalizeText(tx)
+	fields := strings.Fields(tx)
+	var before []string
+	request := (*brevity.PackageRequest)(nil)
+	if word, idx, ok := findRequestWord(fields); ok && word == push {
+		before = trimPushPreamble(fields[:idx])
+		request = parsePush("", controller, fields[idx+1:])
+	} else if i := strings.Index(tx, checkIn); i > 0 {
+		before = strings.Fields(tx[:i])
+		request = &brevity.PackageRequest{Controller: controller, Kind: brevity.PackageCheckIn}
+	} else {
+		return nil
+	}
+	pilot, ok := callsigns.ParsePilotCallsign(numwords.ParseString(strings.Join(before, " ")))
+	if !ok {
+		return nil
+	}
+	request.Callsign = pilot
+	return request
 }
 
 // Anyface is a brevity codeword that can be used in place of a GCI callsign.
@@ -61,25 +155,54 @@ const (
 	strobe     string = "strobe"
 	tripwire   string = "tripwire"
 	vector     string = "vector"
+	push       string = "push"
+	pushTime   string = "time"
 )
 
-var requestWords = []string{radioCheck, alphaCheck, bogeyDope, declare, picture, spiked, strobe, snaplock, tripwire, shopping, vector}
+var requestWords = []string{radioCheck, alphaCheck, bogeyDope, declare, picture, spiked, strobe, snaplock, tripwire, shopping, vector, push}
 
-// findControllerCallsign searches for the GCI callsign in the given fields.
-// Returns the heard callsign, remaining text after it, and whether it was found.
-func (p *Parser) findControllerCallsign(fields []string) (heard string, rest string, ok bool) {
+// findControllerCallsign searches for the GCI callsign, ANYFACE or a package controller callsign in
+// the given fields. Returns the heard callsign, the wake phrase it matched, the remaining text after
+// it, and whether it was found.
+func (p *Parser) findControllerCallsign(fields []string) (heard string, matched string, rest string, ok bool) {
+	phrases := p.wakePhrases()
 	for i := range fields {
 		candidate := strings.Join(fields[:i+1], " ")
-		for _, wakePhrase := range []string{p.controllerCallsign, Anyface} {
+		for _, wakePhrase := range phrases {
 			if isSimilar(strings.TrimSpace(candidate), strings.ToLower(wakePhrase)) {
 				ok = true
 				heard = candidate
+				matched = strings.ToLower(wakePhrase)
 				rest = strings.Join(fields[i+1:], " ")
 				return
 			}
 		}
 	}
-	return "", "", false
+	return "", "", "", false
+}
+
+// pushPreamble are words a pilot says between their callsign and PUSH: "ready to push", "say push
+// time". They are dropped before the callsign is read, or "to" reads as a "2".
+var pushPreamble = map[string]bool{"ready": true, "to": true, "say": true, "request": true, "for": true}
+
+func trimPushPreamble(fields []string) []string {
+	for len(fields) > 0 && pushPreamble[fields[len(fields)-1]] {
+		fields = fields[:len(fields)-1]
+	}
+	return fields
+}
+
+// parsePush reads a PUSH request: "say push time" or "push time" asks for the time, anything else
+// with "push" in it is a flight reporting ready to push.
+func parsePush(pilotCallsign, controller string, requestArgs []string) *brevity.PackageRequest {
+	kind := brevity.PackageReadyToPush
+	for _, arg := range requestArgs {
+		if isSimilar(pushTime, arg) {
+			kind = brevity.PackagePushTime
+			break
+		}
+	}
+	return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: controller, Kind: kind}
 }
 
 // handleNoRequestWord handles cases where we heard the GCI callsign and pilot callsign
@@ -150,7 +273,7 @@ func findRequestWord(fields []string) (string, int, bool) {
 // uncrushCallsign corrects a corner case where the GCI callsign and the
 // following token have no space between them, e.g. "anyfaceeagle 1".
 func (p *Parser) uncrushCallsign(s string) string {
-	for _, callsign := range []string{p.controllerCallsign, Anyface} {
+	for _, callsign := range p.wakePhrases() {
 		lc := strings.ToLower(callsign)
 		if strings.HasPrefix(s, lc) {
 			return lc + " " + s[len(lc):]
@@ -172,19 +295,15 @@ func (p *Parser) Parse(tx string) any {
 		tx = tx[:maxInputLength]
 	}
 
-	logger := log.With().Str("gci", p.controllerCallsign).Logger()
+	logger := log.With().Str("gci", p.callsign()).Logger()
 	if p.enableTextLogging {
 		logger = logger.With().Str("text", tx).Logger()
 	}
 	logger.Debug().Msg("parsing text")
-	tx = normalize.Normalize(tx)
-	for _, replacement := range replacements {
-		tx = strings.ReplaceAll(tx, replacement.Original, replacement.Normal)
-	}
+	tx = p.normalizeText(tx)
 	if tx == "" {
 		return nil
 	}
-	tx = p.uncrushCallsign(tx)
 
 	if p.enableTextLogging {
 		logger = logger.With().Str("normalized", tx).Logger()
@@ -200,9 +319,12 @@ func (p *Parser) Parse(tx string) any {
 		logger = logger.With().Str("request", requestWord).Logger()
 		logger.Debug().Int("position", idx).Msg("found request word")
 		before, requestArgs = fields[:idx], fields[idx+1:]
+		if requestWord == push {
+			before = trimPushPreamble(before)
+		}
 	}
 
-	heard, rest, ok := p.findControllerCallsign(before)
+	heard, matched, rest, ok := p.findControllerCallsign(before)
 
 	if !ok {
 		logger.Trace().Msg("no GCI callsign found")
@@ -237,7 +359,13 @@ func (p *Parser) Parse(tx string) any {
 	}
 	if requestWord == "" {
 		logger.Trace().Msg("no request word found")
+		if p.isPackageController(matched) && strings.Contains(tx, checkIn) {
+			return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: matched, Kind: brevity.PackageCheckIn}
+		}
 		return handleNoRequestWord(tx, pilotCallsign)
+	}
+	if requestWord == push {
+		return parsePush(pilotCallsign, matched, requestArgs)
 	}
 
 	switch requestWord {

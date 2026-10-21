@@ -29,6 +29,11 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 	}
 	logger.Info().Msg("parsing text")
 	request := a.parser.Parse(text)
+	if request == nil && a.heardOnLooseStrike(ctx) {
+		if loose := a.parser.ParseLoosePackageCall(text); loose != nil {
+			request = loose
+		}
+	}
 	ctx = traces.WithParsedAt(ctx, time.Now())
 	if request != nil {
 		ctx = traces.WithRequest(ctx, request)

@@ -183,6 +183,16 @@ func (r *Radar) setBullseyeForGroup(grp *group) {
 	grp.bullseye = brevity.NewBullseye(bearing, distance)
 }
 
+// BullseyeOf is the magnetic bullseye position of a point, or nil when no bullseye is known.
+func (r *Radar) BullseyeOf(p orb.Point) *brevity.Bullseye {
+	bullseyePoint := r.Bullseye(r.coalition)
+	if spatial.IsZero(bullseyePoint) {
+		return nil
+	}
+	bearing := spatial.TrueBearing(bullseyePoint, p, r.withProjection()).Magnetic(r.Declination(p))
+	return brevity.NewBullseye(bearing, spatial.Distance(bullseyePoint, p, r.withProjection()))
+}
+
 // Run consumes updates from the simulation channels until the context is cancelled.
 func (r *Radar) Run(ctx context.Context, wg *sync.WaitGroup) {
 	wg.Go(func() {

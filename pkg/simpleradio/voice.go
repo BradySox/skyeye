@@ -42,6 +42,7 @@ func (c *Client) decodeVoice(ctx context.Context, voicePacketsChan <-chan []voic
 					TraceID:    shortuuid.New(),
 					ClientName: name,
 					Audio:      transmissionPCM,
+					Frequency:  c.heardFrequency(voicePackets[0]),
 				}
 			} else {
 				log.Debug().Msg("decoded transmission PCM is empty")
@@ -55,17 +56,10 @@ func (c *Client) decodeVoice(ctx context.Context, voicePacketsChan <-chan []voic
 
 // encodeVoice encodes audio from the client's txChan and publishes an entire transmission's worth of voice packets to packetCh.
 func (c *Client) encodeVoice(ctx context.Context, packetChan chan<- []voice.Packet) {
-	frequencyList := make([]voice.Frequency, 0, len(c.clientInfo.RadioInfo.Radios))
-	for _, radio := range c.clientInfo.RadioInfo.Radios {
-		frequencyList = append(frequencyList, voice.Frequency{
-			Frequency:  radio.Frequency,
-			Modulation: byte(radio.Modulation),
-			Encryption: 0,
-		})
-	}
 	for {
 		select {
 		case transmission := <-c.txChan:
+			frequencyList := c.transmitFrequencies(transmission)
 			encoder, err := opus.NewEncoder(int(rate.Wideband.Hertz()), channels, opusApplicationVoIP)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to create Opus encoder")

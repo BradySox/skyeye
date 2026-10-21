@@ -35,6 +35,7 @@ func (c *Client) newMessage(t types.MessageType) types.Message {
 		Type:    t,
 	}
 	client := c.clientInfo
+	client.RadioInfo = c.allRadioInfo()
 	message.Client = &client
 	return message
 }

@@ -50,6 +50,11 @@ type Configuration struct {
 	GRPCAddress string
 	// GRPCAPIKey is the API key for authenticating with the DCS-gRPC server
 	GRPCAPIKey string
+	// VoicesDir is a folder of extra Piper voices (one subfolder each) a mission may ask for.
+	VoicesDir string
+	// MissionLinkAddress is the local UDP address a mission script running a package controller
+	// talks to SkyEye on. Empty disables the mission link.
+	MissionLinkAddress string
 	// EnableTranscriptionLogging controls whether transcriptions are included in logs.
 	EnableTranscriptionLogging bool
 	// Callsign is the GCI callsign used on SRS

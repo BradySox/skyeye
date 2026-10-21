@@ -18,6 +18,7 @@ import (
 	"github.com/dharmab/skyeye/pkg/composer"
 	"github.com/dharmab/skyeye/pkg/controller"
 	"github.com/dharmab/skyeye/pkg/encyclopedia"
+	"github.com/dharmab/skyeye/pkg/missionlink"
 	"github.com/dharmab/skyeye/pkg/parser"
 	"github.com/dharmab/skyeye/pkg/radar"
 	"github.com/dharmab/skyeye/pkg/recognizer"
@@ -50,6 +51,8 @@ type Application struct {
 	chatListener *commands.ChatListener
 	// parser converts English brevity text to internal representations
 	parser *parser.Parser
+	// missionLink talks to a mission script running a package controller, if enabled
+	missionLink *missionlink.Link
 	// radar tracks contacts and provides geometric computations
 	radar *radar.Radar
 	// controller publishes responses and calls
@@ -58,6 +61,23 @@ type Application struct {
 	composer composer.Composer
 	// speaker provides text-to-speech synthesis
 	speaker speakers.Speaker
+	// voiceSpeakers are extra Piper speakers by voice, for mission lines in another voice
+	voiceSpeakers map[string]speakers.Speaker
+	// voicesDir holds extra Piper voices a mission may ask for
+	voicesDir string
+	// speakersLock guards speakers, gciVoice and strike
+	speakersLock sync.Mutex
+	// gciVoice is SkyEye's own voice; a mission may change it
+	gciVoice string
+	// voiceSpeed and voicePause configure extra speakers
+	voiceSpeed float64
+	voicePause time.Duration
+	// strike is the mission's strike frequency, set by the mission link
+	strike *simpleradio.RadioFrequency
+	// looseCalls lets a package call on strike name only the pilot, set by the mission link
+	looseCalls bool
+	// strikeThreatsOnly keeps the GCI on strike to threat calls, set by the mission link
+	strikeThreatsOnly bool
 	// speakerLock prevents multiple instances from running the speaker at the same time
 	speakerLock *flock.Flock
 	// volume is the audio output volume level
@@ -235,8 +255,18 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		}
 	}
 
+	var link *missionlink.Link
+	if config.MissionLinkAddress != "" {
+		log.Info().Str("address", config.MissionLinkAddress).Msg("constructing mission link")
+		link, err = missionlink.Listen(config.MissionLinkAddress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct application: %w", err)
+		}
+	}
+
 	log.Info().Msg("constructing application")
 	app := &Application{
+		missionLink:                link,
 		callsign:                   config.Callsign,
 		enableTranscriptionLogging: config.EnableTranscriptionLogging,
 		chatListener:               chatListener,
@@ -249,6 +279,11 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		controller:                 gciController,
 		composer:                   responseComposer,
 		speaker:                    synthesizer,
+		voiceSpeakers:              map[string]speakers.Speaker{builtinVoiceName(config.Voice): synthesizer},
+		gciVoice:                   builtinVoiceName(config.Voice),
+		voicesDir:                  config.VoicesDir,
+		voiceSpeed:                 config.VoiceSpeed,
+		voicePause:                 config.VoicePauseLength,
 		speakerLock:                config.VoiceLock,
 		volume:                     config.Volume,
 		tracers:                    tracers,
@@ -335,6 +370,13 @@ func (a *Application) Run(ctx context.Context, cancel context.CancelFunc, wg *sy
 					rxTextChan <- Message[string]{Context: rCtx, Data: request.Text}
 				}
 			}
+		})
+	}
+
+	if a.missionLink != nil {
+		log.Info().Msg("starting mission link routine")
+		wg.Go(func() {
+			a.runMissionLink(ctx, txTextChan)
 		})
 	}
 

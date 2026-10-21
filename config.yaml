@@ -108,6 +108,24 @@
 # a network, as it allows powerful control over the DCS World server and mission.
 #grpc-password: passwordgoeshere
 
+# MISSION LINK (optional)
+# Lets a mission script that runs strike packages, such as DCS Retribution's
+# RetLab package controller, use SkyEye as its voice. The mission tells SkyEye
+# its package frequencies and the controller callsigns (for example the AWACS
+# callsign, "Darkstar"). SkyEye then also listens on those frequencies, passes
+# CHECK IN, READY TO PUSH and SAY PUSH TIME calls to the mission, and speaks the
+# mission's answers and push calls on the package frequency. A mission can
+# also name a common strike frequency: SkyEye joins it as the GCI, but only
+# answers calls heard there and repeats threat and merge calls there, so it
+# does not step on the package traffic. The mission picks SkyEye's voice and
+# the controller's voice. Local only.
+#mission-link-address: 127.0.0.1:42690
+#
+# Extra Piper voices a mission may ask for, one subfolder per voice (for example
+# voices/en_GB-alan-medium with its .onnx and .onnx.json). Download voices from
+# https://huggingface.co/rhasspy/piper-voices.
+#voices-dir: voices
+
 # IDENTITY
 # Set the callsign to whatever you want the GCI to use as the callsign. Good
 # callsigns should be in English, two or three syllables, and easy to

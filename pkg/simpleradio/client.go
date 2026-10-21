@@ -26,6 +26,11 @@ type Transmission struct {
 	ClientName string
 	// Audio sample for the transmission.
 	Audio Audio
+	// Frequencies, when set on an outgoing transmission, replaces the client's
+	// default frequencies for that one transmission.
+	Frequencies []RadioFrequency
+	// Frequency is the frequency an incoming transmission was heard on, if known.
+	Frequency *RadioFrequency
 }
 
 // Client is a SimpleRadio-Standalone Client.
@@ -60,6 +65,12 @@ type Client struct {
 	txChan chan Transmission
 	// receivers tracks the state of each radio we are listening to.
 	receivers map[types.Radio]*receiver
+	// radioLock guards clientInfo.RadioInfo.Radios and receivers, which
+	// AddListenRadios changes while the client runs.
+	radioLock sync.RWMutex
+	// listenRadioCount is how many radios at the end of clientInfo.RadioInfo.Radios are listen
+	// radios: heard, and transmitted on only when a transmission names them.
+	listenRadioCount int
 	// packetNumber is incremented for each voice packet transmitted.
 	packetNumber uint64
 	// txLock prevents multiple outgoing transmissions from occurring simultaneously. It must be acquired before writing
@@ -134,9 +145,11 @@ func (c *Client) initialize() error {
 		return fmt.Errorf("failed to connect external AWACS mode: %w", err)
 	}
 
+	c.radioLock.RLock()
 	for _, receiver := range c.receivers {
 		receiver.reset()
 	}
+	c.radioLock.RUnlock()
 
 	c.SendPing()
 

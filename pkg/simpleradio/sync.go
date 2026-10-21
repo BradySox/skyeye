@@ -41,7 +41,8 @@ func (c *Client) syncClient(other types.ClientInfo) {
 		Msgf("synced with SRS client %q", other.Name)
 
 	isSameCoalition := c.clientInfo.Coalition == other.Coalition || types.IsSpectator(other.Coalition)
-	isOnFrequency := c.clientInfo.RadioInfo.IsOnFrequency(other.RadioInfo)
+	all := c.allRadioInfo()
+	isOnFrequency := all.IsOnFrequency(other.RadioInfo)
 
 	// if the other client has a matching radio and is not in an opposing coalition, store it in the clients map. Otherwise, banish it to the shadow realm.
 	c.clientsLock.Lock()

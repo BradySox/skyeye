@@ -39,6 +39,8 @@ func (a *Application) handleRequest(ctx context.Context, r any) {
 		a.controller.HandleBogeyDope(ctx, request)
 	case *brevity.CheckInRequest:
 		a.controller.HandleCheckIn(ctx, request)
+	case *brevity.PackageRequest:
+		a.handlePackageRequest(ctx, request)
 	case *brevity.DeclareRequest:
 		a.controller.HandleDeclare(ctx, request)
 	case *brevity.PictureRequest:

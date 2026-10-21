@@ -41,7 +41,13 @@ func (a *Application) synthesizeMessage(ctx context.Context, response composer.N
 	start := time.Now()
 	synthesisCtx, synthesisCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer synthesisCancel()
-	audio, err := a.speaker.SayContext(synthesisCtx, response.Speech)
+	speaker, err := a.speakerFor(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("error synthesizing speech")
+		a.trace(traces.WithRequestError(ctx, err))
+		return
+	}
+	audio, err := speaker.SayContext(synthesisCtx, response.Speech)
 	if err != nil {
 		log.Error().Err(err).Msg("error synthesizing speech")
 		a.trace(traces.WithRequestError(ctx, err))
