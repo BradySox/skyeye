@@ -171,3 +171,21 @@ func TestDecodeRejectsMalformedPackets(t *testing.T) {
 		})
 	}
 }
+
+// SRS 2.4 clients send the fixed segment as its 57 bytes of fields, with no pad byte. Every
+// player's voice was dropped as malformed until Decode accepted it (2026-10-21).
+func TestDecodeAcceptsAnUnpaddedFixedSegment(t *testing.T) {
+	t.Parallel()
+	packet := testPacket([]byte{0x1, 0x2, 0x3, 0x4}, []Frequency{{Frequency: 251_000_000}})
+	padded := packet.Encode()
+	pad := len(padded) - fixedSegmentLength
+	unpadded := append(append([]byte(nil), padded[:pad]...), padded[pad+1:]...)
+	binary.LittleEndian.PutUint16(unpadded[0:2], uint16(len(unpadded))) //nolint:gosec // test packet is tiny
+	decoded, err := Decode(unpadded)
+	require.NoError(t, err)
+	assert.Equal(t, packet.UnitID, decoded.UnitID)
+	assert.Equal(t, packet.PacketID, decoded.PacketID)
+	assert.Equal(t, packet.OriginGUID, decoded.OriginGUID)
+	assert.Equal(t, packet.AudioBytes, decoded.AudioBytes)
+	assert.Len(t, decoded.Frequencies, 1)
+}
