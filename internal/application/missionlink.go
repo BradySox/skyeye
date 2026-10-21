@@ -93,7 +93,7 @@ func (a *Application) answersOnStrike(heard *simpleradio.RadioFrequency) bool {
 	threatsOnly := a.strikeThreatsOnly
 	a.speakersLock.Unlock()
 	strike, ok := a.strikeFrequency()
-	return !(threatsOnly && ok && heard != nil && heard.IsSameFrequency(strike))
+	return !threatsOnly || !ok || heard == nil || !heard.IsSameFrequency(strike)
 }
 
 // Voice names: "feminine" and "masculine" are the built-in voices; anything else is a Piper voice
