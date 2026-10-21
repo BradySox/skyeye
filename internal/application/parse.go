@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/dharmab/skyeye/pkg/parser"
 	"github.com/dharmab/skyeye/pkg/traces"
 	"github.com/rs/zerolog/log"
 )
@@ -28,10 +29,22 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 		logger = logger.With().Str("text", text).Logger()
 	}
 	logger.Info().Msg("parsing text")
-	request := a.parser.Parse(text)
-	if request == nil && a.heardOnLooseStrike(ctx) {
-		if loose := a.parser.ParseLoosePackageCall(text); loose != nil {
-			request = loose
+	var request any
+	atc, loose := false, false
+	if frequency, ok := heardFrequencyFrom(ctx); ok {
+		atc, loose = a.isATCFrequency(frequency)
+	}
+	if atc {
+		// An airfield frequency carries ATC calls only: the GCI never answers there.
+		if call := parser.ParseATC(text, loose); call != nil {
+			request = call
+		}
+	} else {
+		request = a.parser.Parse(text)
+		if request == nil && a.heardOnLooseStrike(ctx) {
+			if pkgCall := a.parser.ParseLoosePackageCall(text); pkgCall != nil {
+				request = pkgCall
+			}
 		}
 	}
 	ctx = traces.WithParsedAt(ctx, time.Now())
