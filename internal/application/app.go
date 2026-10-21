@@ -45,6 +45,11 @@ type Application struct {
 	telemetryClient telemetry.Client
 	// recognizer provides speech-to-text recognition
 	recognizer recognizer.Recognizer
+	// vocabulary is what the mission link has told SkyEye pilots will say, for the recognizer's
+	// prompt
+	vocabulary missionVocabulary
+	// vocabularyLock guards vocabulary
+	vocabularyLock sync.Mutex
 	// recognizerLock prevents multiple instances from running the recognizer at the same time
 	recognizerLock *flock.Flock
 	// chatListener listens for chat messages
@@ -186,9 +191,9 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		locationNames = append(locationNames, loc.Names...)
 	}
 
-	recognizerOpts := []recognizer.Option{recognizer.WithLocations(locationNames)}
+	recognizerOpts := []recognizer.Option{recognizer.WithLocations(locationNames), recognizer.WithThreads(config.WhisperThreads)}
 
-	log.Info().Msg("constructing speech-to-text recognizer")
+	log.Info().Uint("whisperThreads", config.WhisperThreads).Msg("constructing speech-to-text recognizer")
 	var speechRecognizer recognizer.Recognizer
 	switch config.Recognizer {
 	case conf.WhisperLocal:

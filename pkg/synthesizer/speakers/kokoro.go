@@ -28,6 +28,10 @@ var kokoroSpeakers = strings.Split("af_alloy,af_aoede,af_bella,af_heart,af_jessi
 	"jf_gongitsune,jf_nezumi,jf_tebukuro,jm_kumo,pf_dora,pm_alex,pm_santa,zf_xiaobei,zf_xiaoni,"+
 	"zf_xiaoxiao,zf_xiaoyi,zm_yunjian,zm_yunxi,zm_yunxia,zm_yunyang,em_santa", ",")
 
+// kokoroThreads is the tool's thread count. Synthesis already runs one line at a time, and more
+// threads only compete with speech recognition and DCS for the CPU.
+const kokoroThreads = 2
+
 // kokoroSynth speaks with one Kokoro voice through sherpa-onnx's offline TTS tool, which lives in
 // the model folder's bin directory.
 type kokoroSynth struct {
@@ -78,7 +82,7 @@ func (s *kokoroSynth) args(text, out string) []string {
 		"--kokoro-data-dir=" + filepath.Join(s.dir, "espeak-ng-data"),
 		"--kokoro-lexicon=" + filepath.Join(s.dir, lexicon),
 		"--kokoro-lang=" + lang,
-		"--num-threads=4",
+		"--num-threads=" + strconv.Itoa(kokoroThreads),
 		"--sid=" + strconv.Itoa(s.speaker),
 		"--output-filename=" + out,
 	}

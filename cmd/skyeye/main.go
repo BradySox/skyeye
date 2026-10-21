@@ -31,6 +31,7 @@ import (
 	"github.com/dharmab/skyeye/pkg/coalitions"
 	"github.com/dharmab/skyeye/pkg/encyclopedia"
 	"github.com/dharmab/skyeye/pkg/locations"
+	"github.com/dharmab/skyeye/pkg/recognizer/tuning"
 	"github.com/dharmab/skyeye/pkg/synthesizer/voices"
 	"github.com/ggerganov/whisper.cpp/bindings/go/pkg/whisper"
 )
@@ -60,6 +61,7 @@ var (
 	telemetryUpdateInterval      time.Duration
 	recognizerName               string
 	whisperModelPath             string
+	whisperThreads               int
 	recognizerLockPath           string
 	openAIAPIKey                 string
 	voiceName                    string
@@ -137,6 +139,7 @@ func init() {
 	recognizerFlag := cli.NewEnum(&recognizerName, "Recognizer", string(conf.WhisperLocal), string(conf.WhisperAPI), string(conf.GPT4o), string(conf.GPT4oMini))
 	skyeye.Flags().Var(recognizerFlag, "recognizer", "Speech-to-text recognizer to use")
 	skyeye.Flags().StringVar(&whisperModelPath, "whisper-model", "", "Path to whisper.cpp model")
+	skyeye.Flags().IntVar(&whisperThreads, "whisper-threads", tuning.DefaultThreads, "CPU threads for local speech recognition, at most the number of logical CPUs. 0 uses the default")
 	skyeye.Flags().StringVar(&openAIAPIKey, "openai-api-key", "", "API key for OpenAPI AI")
 	skyeye.MarkFlagsOneRequired("whisper-model", "openai-api-key")
 	skyeye.Flags().StringVar(&recognizerLockPath, "recognizer-lock-path", "", "Path to lock file for concurrent speech-to-text when using multiple instances")
@@ -457,6 +460,7 @@ func run(_ *cobra.Command, _ []string) {
 		Recognizer:                   conf.Recognizer(recognizerName),
 		RecognizerLock:               recognizerLock,
 		WhisperModel:                 whisperModel,
+		WhisperThreads:               tuning.Threads(whisperThreads, runtime.NumCPU()),
 		OpenAIAPIKey:                 openAIAPIKey,
 		Voice:                        voice,
 		UseSystemVoice:               useSystemVoice,

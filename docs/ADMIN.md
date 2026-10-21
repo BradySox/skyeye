@@ -230,6 +230,10 @@ recognizer: openai-whisper-local
 whisper-model: whisper.bin
 ```
 
+`whisper-threads` sets the CPU threads local recognition uses. It defaults to 8, capped at the machine's logical CPUs. More threads than that compete with DCS on the same machine and slow recognition down.
+
+At startup SkyEye runs one recognition on a second of silence, so the first real transmission does not pay the GPU's first-use cost. The log shows it as `speech recognition warmed up`, and each transmission gets a `whisper recognition timing` line with the audio length, the recognition time and the thread count.
+
 ## Speech Synthesis
 
 ### Windows and Linux

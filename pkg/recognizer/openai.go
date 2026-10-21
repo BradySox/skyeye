@@ -15,17 +15,19 @@ import (
 )
 
 type openAIRecognizer struct {
-	callsign string
-	client   *openai.Client
-	model    string
+	client *openai.Client
+	model  string
 	recognizerOptions
+	*promptState
 }
 
-var _ Recognizer = &openAIRecognizer{}
+var (
+	_ Recognizer       = &openAIRecognizer{}
+	_ VocabularySetter = &openAIRecognizer{}
+)
 
 func newOpenAIRecognizer(apiKey, model, callsign string, opts ...Option) Recognizer {
 	r := &openAIRecognizer{
-		callsign: callsign,
 		client: openai.NewClient(
 			option.WithAPIKey(apiKey),
 		),
@@ -34,6 +36,7 @@ func newOpenAIRecognizer(apiKey, model, callsign string, opts ...Option) Recogni
 	for _, opt := range opts {
 		opt(&r.recognizerOptions)
 	}
+	r.promptState = newPromptState(callsign, r.recognizerOptions.locations)
 	return r
 }
 
@@ -66,11 +69,12 @@ func (r *openAIRecognizer) Recognize(ctx context.Context, sample []float32, _ bo
 		return "", fmt.Errorf("error creating WAV: %w", err)
 	}
 
+	prompt, _ := r.current()
 	body := openai.AudioTranscriptionNewParams{
 		File:     openai.FileParam(buf, "audio.wav", "audio/wav"),
 		Model:    openai.String(r.model),
 		Language: openai.String("en"),
-		Prompt:   openai.String(prompt(r.callsign, r.locations)),
+		Prompt:   openai.String(prompt),
 	}
 
 	log.Info().Str("model", r.model).Msg("calling OpenAI Audio Transcriptions API")
