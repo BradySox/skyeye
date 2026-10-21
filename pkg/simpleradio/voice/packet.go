@@ -60,7 +60,7 @@ type Packet struct {
 
 	// UnitID is the ID of the in-game unit that originated the packet.
 	//
-	// Bytes: PacketLength-58:PacketLength-53
+	// Bytes: PacketLength-57:PacketLength-53
 	//
 	// Length: 4 bytes
 	UnitID uint32
@@ -111,8 +111,9 @@ type Frequency struct {
 const (
 	// headerSegmentLength is the length of the header segment in bytes.
 	headerSegmentLength = 6
-	// fixedSegmentLength is the length of the fixed segment in bytes.
-	fixedSegmentLength = 58
+	// fixedSegmentLength is the length of the fixed segment in bytes. SRS 2.4 reads it forward from
+	// the end of the frequencies segment, so a pad byte here shifts every field it reads.
+	fixedSegmentLength = 57
 	// frequencyLength is the length of a Frequency in bytes.
 	frequencyLength = 10
 )
@@ -166,7 +167,7 @@ func (p *Packet) Encode() []byte {
 	}
 
 	/* Fixed Segment */
-	fixedSegmentPtr := p.PacketLength - fixedSegmentLength + 1
+	fixedSegmentPtr := p.PacketLength - fixedSegmentLength
 	unitIDPtr := fixedSegmentPtr
 	packetIDPtr := unitIDPtr + 4
 	binary.LittleEndian.PutUint32(b[unitIDPtr:packetIDPtr], p.UnitID)
@@ -217,10 +218,10 @@ func Decode(b []byte) (packet *Packet, err error) {
 	if int(packetLength) != len(b) {
 		return nil, fmt.Errorf("packet length header %d does not match datagram length %d", packetLength, len(b))
 	}
-	// The fixed segment's fields are 57 bytes. SkyEye's own encoder (and older SRS) pads it to 58,
-	// but SRS 2.4 clients send exactly 57; both decode the same, working back from the end.
+	// SRS 2.4 sends the 57-byte fixed segment; older SkyEye builds padded it to 58. Both decode the
+	// same, working back from the end.
 	segmentsLength := headerSegmentLength + int(audioSegmentLength) + int(frequenciesSegmentLength) + fixedSegmentLength
-	if segmentsLength != int(packetLength) && segmentsLength-1 != int(packetLength) {
+	if segmentsLength != int(packetLength) && segmentsLength+1 != int(packetLength) {
 		return nil, fmt.Errorf("length of packet segments %d does not match packet length header %d", segmentsLength, packetLength)
 	}
 	if frequenciesSegmentLength%frequencyLength != 0 {
