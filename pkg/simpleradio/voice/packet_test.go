@@ -94,7 +94,7 @@ func TestDecodeMatchesObservedFraming(t *testing.T) {
 	})
 	encoded := packet.Encode()
 
-	require.Len(t, encoded, 135, "header 6 + audio 31 + frequencies 40 + fixed 58")
+	require.Len(t, encoded, 134, "header 6 + audio 31 + frequencies 40 + fixed 57")
 	decoded, err := Decode(encoded)
 	require.NoError(t, err)
 	assert.Equal(t, uint16(31), decoded.AudioSegmentLength)
@@ -172,20 +172,39 @@ func TestDecodeRejectsMalformedPackets(t *testing.T) {
 	}
 }
 
-// SRS 2.4 clients send the fixed segment as its 57 bytes of fields, with no pad byte. Every
-// player's voice was dropped as malformed until Decode accepted it (2026-10-21).
-func TestDecodeAcceptsAnUnpaddedFixedSegment(t *testing.T) {
+// Older SkyEye builds padded the fixed segment to 58 bytes with a leading zero. Decode still
+// accepts that framing from a peer running one.
+func TestDecodeAcceptsAPaddedFixedSegment(t *testing.T) {
 	t.Parallel()
 	packet := testPacket([]byte{0x1, 0x2, 0x3, 0x4}, []Frequency{{Frequency: 251_000_000}})
-	padded := packet.Encode()
-	pad := len(padded) - fixedSegmentLength
-	unpadded := append(append([]byte(nil), padded[:pad]...), padded[pad+1:]...)
-	binary.LittleEndian.PutUint16(unpadded[0:2], uint16(len(unpadded))) //nolint:gosec // test packet is tiny
-	decoded, err := Decode(unpadded)
+	unpadded := packet.Encode()
+	fixed := len(unpadded) - fixedSegmentLength
+	padded := append(append(append([]byte(nil), unpadded[:fixed]...), 0), unpadded[fixed:]...)
+	binary.LittleEndian.PutUint16(padded[0:2], uint16(len(padded))) //nolint:gosec // test packet is tiny
+	decoded, err := Decode(padded)
 	require.NoError(t, err)
 	assert.Equal(t, packet.UnitID, decoded.UnitID)
 	assert.Equal(t, packet.PacketID, decoded.PacketID)
 	assert.Equal(t, packet.OriginGUID, decoded.OriginGUID)
 	assert.Equal(t, packet.AudioBytes, decoded.AudioBytes)
 	assert.Len(t, decoded.Frequencies, 1)
+}
+
+// SRS 2.4.1 (UDPVoicePacket.DecodeVoicePacket) reads the fixed segment forward from
+// header+audio+frequencies: UnitId, PacketNumber, hops, then the two GUIDs. A pad byte before
+// UnitId made SRS read a shifted UnitId.
+func TestEncodePlacesFixedSegmentAtSRSOffsets(t *testing.T) {
+	t.Parallel()
+	audio := make([]byte, 31)
+	frequencies := []Frequency{{Frequency: 251_000_000}, {Frequency: 40_000_000, Modulation: 1}}
+	packet := NewPacket(audio, frequencies, 100000002, 3626329, 2, []byte(testRelay), []byte(testOrigin))
+	encoded := packet.Encode()
+
+	offset := headerSegmentLength + len(audio) + len(frequencies)*frequencyLength
+	require.Len(t, encoded, offset+57)
+	assert.Equal(t, uint32(100000002), binary.LittleEndian.Uint32(encoded[offset:offset+4]))
+	assert.Equal(t, uint64(3626329), binary.LittleEndian.Uint64(encoded[offset+4:offset+12]))
+	assert.Equal(t, byte(2), encoded[offset+12])
+	assert.Equal(t, testRelay, string(encoded[offset+13:offset+13+types.GUIDLength]))
+	assert.Equal(t, testOrigin, string(encoded[offset+13+types.GUIDLength:offset+13+2*types.GUIDLength]))
 }
