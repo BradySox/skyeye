@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/dharmab/numwords"
@@ -84,12 +85,7 @@ func isFillerBetweenDigits(fields []string, i int) bool {
 
 // hasDigits is true if the words hold a number, as a pilot callsign does.
 func hasDigits(fields []string) bool {
-	for _, f := range strings.Fields(numwords.ParseString(strings.Join(fields, " "))) {
-		if isAllDigits(f) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(strings.Fields(numwords.ParseString(strings.Join(fields, " "))), isAllDigits)
 }
 
 // findControllerAfterCallsign finds the controller callsign said after the pilot's: "Ford 9,
