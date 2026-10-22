@@ -115,9 +115,14 @@ type Emitter struct {
 	// Voice of the speaker; empty uses SkyEye's own voice.
 	Voice string `json:"voice,omitempty"`
 	// Label of the emitter as spoken, such as "SA-6".
-	Label string  `json:"label"`
-	Lat   float64 `json:"lat"`
-	Lon   float64 `json:"lon"`
+	Label string `json:"label"`
+	// Status is "awake" (radiating now) or "asleep" (located earlier, off now). Empty for a
+	// mission that does not say, which gets the older "new emitter" call.
+	Status string `json:"status,omitempty"`
+	// Fix is "tight" (within about a mile) or "loose" (up to about 15). Empty says nothing.
+	Fix string  `json:"fix,omitempty"`
+	Lat float64 `json:"lat"`
+	Lon float64 `json:"lon"`
 }
 
 // ATCPosition is one controller position at an airfield.
