@@ -79,6 +79,11 @@ type Controller struct {
 
 	// calls is the channel to publish responses and calls to.
 	calls chan<- Call
+
+	// sunriseReady, when set, holds the sunrise call until it closes or sunriseTimeout passes, so
+	// the call names the callsign a mission sets.
+	sunriseReady   <-chan struct{}
+	sunriseTimeout time.Duration
 }
 
 // New creates a new GCI controller.
@@ -120,7 +125,11 @@ func (c *Controller) Run(ctx context.Context, calls chan<- Call) {
 	c.scope.SetRemovedCallback(c.handleRemoved)
 	c.scope.SetStartedCallback(c.handleStarted)
 
-	c.broadcastSunrise(ctx)
+	if c.sunriseReady == nil {
+		c.broadcastSunrise(ctx)
+	} else {
+		go c.awaitSunrise(ctx, c.sunriseReady, c.sunriseTimeout)
+	}
 
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()

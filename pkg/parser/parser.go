@@ -131,7 +131,7 @@ func (p *Parser) ParseLoosePackageCall(tx string) *brevity.PackageRequest {
 	} else {
 		return nil
 	}
-	pilot, ok := callsigns.ParsePilotCallsign(numwords.ParseString(strings.Join(before, " ")))
+	pilot, ok := callsigns.ParsePilotCallsign(leadingCallsign(numwords.ParseString(strings.Join(before, " "))))
 	if !ok {
 		return nil
 	}
@@ -325,6 +325,9 @@ func (p *Parser) Parse(tx string) any {
 	}
 
 	heard, matched, rest, ok := p.findControllerCallsign(before)
+	if !ok {
+		heard, matched, rest, ok = p.findControllerAfterCallsign(before)
+	}
 
 	if !ok {
 		logger.Trace().Msg("no GCI callsign found")
@@ -342,7 +345,7 @@ func (p *Parser) Parse(tx string) any {
 	}
 	event.Msg("searching for pilot callsign in rest of text")
 
-	rest = numwords.ParseString(rest)
+	rest = leadingCallsign(numwords.ParseString(rest))
 	pilotCallsign, ok := callsigns.ParsePilotCallsign(rest)
 	if ok {
 		logger = logger.With().Str("pilot", pilotCallsign).Logger()
@@ -355,12 +358,15 @@ func (p *Parser) Parse(tx string) any {
 		if requestWord != "" && requestWord == picture {
 			return &brevity.PictureRequest{Callsign: ""}
 		}
+		if p.isPackageController(matched) && requestWord == "" {
+			return parsePackageCallWithoutRequestWord(tx, "", matched)
+		}
 		return &brevity.UnableToUnderstandRequest{}
 	}
 	if requestWord == "" {
 		logger.Trace().Msg("no request word found")
-		if p.isPackageController(matched) && strings.Contains(tx, checkIn) {
-			return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: matched, Kind: brevity.PackageCheckIn}
+		if p.isPackageController(matched) {
+			return parsePackageCallWithoutRequestWord(tx, pilotCallsign, matched)
 		}
 		return handleNoRequestWord(tx, pilotCallsign)
 	}

@@ -21,6 +21,9 @@ type contactDatabase struct {
 	lock        sync.RWMutex
 	contacts    map[uint64]*trackfiles.Trackfile
 	callsignIdx map[coalitions.Coalition]map[string]uint64
+	// aliases maps a flight callsign a pilot says, such as "ford 9 1", to the name of the
+	// trackfile flying it, such as the player name "Flash". Set by the mission.
+	aliases map[string]string
 }
 
 func newContactDatabase() *contactDatabase {
@@ -49,6 +52,11 @@ func (db *contactDatabase) getByCallsignAndCoalititon(callsign string, coalition
 
 	foundCallsign := ""
 	id, ok := normalized[callsign]
+	if !ok {
+		if name, isAlias := db.aliases[callsign]; isAlias {
+			id, ok = db.callsignIdx[coalition][name]
+		}
+	}
 	if ok {
 		foundCallsign = callsign
 	} else {
@@ -71,6 +79,20 @@ func (db *contactDatabase) getByCallsignAndCoalititon(callsign string, coalition
 		return "", nil, false
 	}
 	return foundCallsign, contact, true
+}
+
+// setAliases replaces the flight callsigns the database also finds trackfiles by: each key is a
+// callsign as a pilot says it ("Ford 9-1"), each value the trackfile's name ("Flash").
+func (db *contactDatabase) setAliases(aliases map[string]string) {
+	normalized := make(map[string]string, len(aliases))
+	for callsign, name := range aliases {
+		if parsed, ok := callsigns.ParsePilotCallsign(callsign); ok && name != "" {
+			normalized[parsed] = name
+		}
+	}
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	db.aliases = normalized
 }
 
 // getByID returns the trackfile for the given unit ID, or nil if no trackfile was found.
