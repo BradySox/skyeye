@@ -98,7 +98,7 @@ func parseMudBearing(fields []string) (string, bool) {
 	var digits strings.Builder
 	for ; i < len(fields) && digits.Len() < 3; i++ {
 		f := fields[i]
-		if f == "niner" {
+		if f == niner {
 			f = "9"
 		}
 		if _, err := strconv.Atoi(f); err != nil {
