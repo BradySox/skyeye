@@ -19,21 +19,29 @@ func spellReportingName(label string) string {
 	})
 }
 
-// ComposeEmitter constructs natural language for an ISR report of a radiating ground emitter, such
-// as "Vacuum, new emitter, SA-6, bullseye 0-9-0, 25." A nil bullseye reports the emitter without a
-// position.
-func (c *Composer) ComposeEmitter(callsign, label string, bullseye *brevity.Bullseye) NaturalLanguageResponse {
+// ComposeEmitter constructs natural language for an ISR report of a ground emitter, such as
+// "Vacuum, SA-6 awake, bullseye 3-0-4, 60, tight." With no status it is the older "Vacuum, new
+// emitter, SA-6, bullseye 0-9-0, 25." A nil bullseye reports the emitter without a position; an
+// empty fix says nothing about the fix.
+func (c *Composer) ComposeEmitter(callsign, label, status, fix string, bullseye *brevity.Bullseye) NaturalLanguageResponse {
 	response := NaturalLanguageResponse{
 		Subtitle: callsign + ", new emitter, " + label,
 		Speech:   callsign + ", new emitter, " + spellReportingName(label),
 	}
-	if bullseye == nil {
-		response.Subtitle += "."
-		response.Speech += "."
-		return response
+	if status != "" {
+		response.Subtitle = callsign + ", " + label + " " + status
+		response.Speech = callsign + ", " + spellReportingName(label) + " " + status
 	}
-	position := c.composeBullseye(bullseye)
-	response.Subtitle += ", " + position.Subtitle + "."
-	response.Speech += ", " + position.Speech + "."
+	if bullseye != nil {
+		position := c.composeBullseye(bullseye)
+		response.Subtitle += ", " + position.Subtitle
+		response.Speech += ", " + position.Speech
+	}
+	if fix != "" {
+		response.Subtitle += ", " + fix
+		response.Speech += ", " + fix
+	}
+	response.Subtitle += "."
+	response.Speech += "."
 	return response
 }

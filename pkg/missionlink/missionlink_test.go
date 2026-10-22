@@ -82,8 +82,8 @@ func TestLinkTuneAndEmitter(t *testing.T) {
 	}
 	link.handle([]byte(`{"type":"tune","frequencies":["262.000AM"]}`), nil, handlers)
 	require.Equal(t, []string{"262.000AM"}, tune.Frequencies)
-	link.handle([]byte(`{"type":"emitter","frequencies":["262.000AM","264.500AM"],"callsign":"Vacuum","label":"SA-6","lat":42.1,"lon":43.2}`), nil, handlers)
-	require.Equal(t, Emitter{Type: TypeEmitter, Frequencies: []string{"262.000AM", "264.500AM"}, Callsign: "Vacuum", Label: "SA-6", Lat: 42.1, Lon: 43.2}, emitter)
+	link.handle([]byte(`{"type":"emitter","frequencies":["262.000AM","264.500AM"],"callsign":"Vacuum","label":"SA-6","status":"awake","fix":"tight","lat":42.1,"lon":43.2}`), nil, handlers)
+	require.Equal(t, Emitter{Type: TypeEmitter, Frequencies: []string{"262.000AM", "264.500AM"}, Callsign: "Vacuum", Label: "SA-6", Status: "awake", Fix: "tight", Lat: 42.1, Lon: 43.2}, emitter)
 
 	called := false
 	ignore := Handlers{OnTune: func(Tune) { called = true }, OnEmitter: func(Emitter) { called = true }}

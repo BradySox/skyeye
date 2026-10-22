@@ -359,7 +359,7 @@ func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[com
 			a.addSpeakerVocabulary(emitter.Callsign)
 			bullseye := a.radar.BullseyeOf(orb.Point{emitter.Lon, emitter.Lat})
 			c := a.currentComposer()
-			response := c.ComposeEmitter(emitter.Callsign, emitter.Label, bullseye)
+			response := c.ComposeEmitter(emitter.Callsign, emitter.Label, emitter.Status, emitter.Fix, bullseye)
 			for _, f := range emitter.Frequencies {
 				frequency, err := simpleradio.ParseRadioFrequency(f)
 				if err != nil {
