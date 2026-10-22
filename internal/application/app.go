@@ -70,8 +70,8 @@ type Application struct {
 	voiceSpeakers map[string]speakers.Speaker
 	// voicesDir holds extra Piper voices a mission may ask for
 	voicesDir string
-	// speakersLock guards speakers, gciVoice, strike, looseCalls, strikeThreatsOnly, atcFrequencies
-	// and atcLoose
+	// speakersLock guards speakers, gciVoice, strike, looseCalls, strikeThreatsOnly, atcFrequencies,
+	// atcLoose and elintFrequencies
 	speakersLock sync.Mutex
 	// gciVoice is SkyEye's own voice; a mission may change it
 	gciVoice string
@@ -85,6 +85,9 @@ type Application struct {
 	atcFrequencies []simpleradio.RadioFrequency
 	// atcLoose parses ATC calls loosely, for a mission's Casual radio discipline.
 	atcLoose bool
+	// elintFrequencies are the own frequencies of the mission's ELINT speakers, such as Vacuum,
+	// mapped to their callsigns, set by the mission link.
+	elintFrequencies map[simpleradio.RadioFrequency]string
 	// looseCalls lets a package call on strike name only the pilot, set by the mission link
 	looseCalls bool
 	// strikeThreatsOnly keeps the GCI on strike to threat calls, set by the mission link

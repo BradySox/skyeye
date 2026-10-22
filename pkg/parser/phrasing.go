@@ -19,10 +19,13 @@ const maxCallsignWordsBeforeController = 4
 // maxControllerWords is how many words a heard controller callsign may take: "any face".
 const maxControllerWords = 3
 
+// niner is the radio word for 9.
+const niner = "niner"
+
 // isDigitHomophone is a word Whisper writes for a digit, read as a digit only after one.
 func isDigitHomophone(word string) bool {
 	_, ok := atcCallsignHomophones[word]
-	return ok || word == "niner"
+	return ok || word == niner
 }
 
 // isCallsignEnd is a word after a number that is never part of a callsign: a distance or a flight

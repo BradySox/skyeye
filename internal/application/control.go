@@ -43,6 +43,8 @@ func (a *Application) handleRequest(ctx context.Context, r any) {
 		a.handlePackageRequest(ctx, request)
 	case *brevity.ATCRequest:
 		a.handleATCRequest(ctx, request)
+	case *brevity.ELINTRequest:
+		a.handleELINTRequest(ctx, request)
 	case *brevity.DeclareRequest:
 		a.controller.HandleDeclare(ctx, request)
 	case *brevity.PictureRequest:

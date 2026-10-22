@@ -293,26 +293,68 @@ func (a *Application) isATCFrequency(frequency simpleradio.RadioFrequency) (atc 
 	return false, false
 }
 
+// applyTune joins a mission speaker's frequencies. A tune that names a speaker, such as Vacuum,
+// also makes calls to it ELINT requests for the mission to answer.
+func (a *Application) applyTune(tune missionlink.Tune) {
+	frequencies := make([]simpleradio.RadioFrequency, 0, len(tune.Frequencies))
+	for _, f := range tune.Frequencies {
+		frequency, err := simpleradio.ParseRadioFrequency(f)
+		if err != nil {
+			log.Warn().Err(err).Str("frequency", f).Msg("ignoring unreadable tune frequency")
+			continue
+		}
+		frequencies = append(frequencies, *frequency)
+	}
+	if err := a.srsClient.AddListenRadios(frequencies); err != nil {
+		log.Error().Err(err).Msg("failed to tune mission frequencies")
+	}
+	if tune.Callsign == "" {
+		return
+	}
+	a.parser.SetSpeaker(tune.Callsign)
+	a.addSpeakerVocabulary(tune.Callsign)
+	if tune.Frequency == "" {
+		return
+	}
+	own, err := simpleradio.ParseRadioFrequency(tune.Frequency)
+	if err != nil {
+		log.Warn().Err(err).Str("frequency", tune.Frequency).Msg("ignoring unreadable speaker frequency")
+		return
+	}
+	a.speakersLock.Lock()
+	defer a.speakersLock.Unlock()
+	if a.elintFrequencies == nil {
+		a.elintFrequencies = map[simpleradio.RadioFrequency]string{}
+	}
+	if a.elintFrequencies[*own] != tune.Callsign {
+		log.Info().Str("callsign", tune.Callsign).Stringer("frequency", own).Msg("mission ELINT speaker answers calls")
+	}
+	a.elintFrequencies[*own] = tune.Callsign
+}
+
+// elintSpeakerOn is the ELINT speaker whose own frequency a call was heard on, or empty.
+func (a *Application) elintSpeakerOn(ctx context.Context) string {
+	heard, ok := heardFrequencyFrom(ctx)
+	if !ok {
+		return ""
+	}
+	a.speakersLock.Lock()
+	defer a.speakersLock.Unlock()
+	for frequency, callsign := range a.elintFrequencies {
+		if frequency.IsSameFrequency(heard) {
+			return callsign
+		}
+	}
+	return ""
+}
+
 // runMissionLink applies the mission's packages and speaks its lines.
 func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[composer.NaturalLanguageResponse]) {
 	log.Info().Stringer("address", a.missionLink.Addr()).Msg("running mission link")
 	a.missionLink.Run(ctx, missionlink.Handlers{
 		OnPackages: a.applyPackages,
 		OnATC:      a.applyATC,
-		OnTune: func(tune missionlink.Tune) {
-			frequencies := make([]simpleradio.RadioFrequency, 0, len(tune.Frequencies))
-			for _, f := range tune.Frequencies {
-				frequency, err := simpleradio.ParseRadioFrequency(f)
-				if err != nil {
-					log.Warn().Err(err).Str("frequency", f).Msg("ignoring unreadable tune frequency")
-					continue
-				}
-				frequencies = append(frequencies, *frequency)
-			}
-			if err := a.srsClient.AddListenRadios(frequencies); err != nil {
-				log.Error().Err(err).Msg("failed to tune mission frequencies")
-			}
-		},
+		OnTune:     a.applyTune,
 		OnEmitter: func(emitter missionlink.Emitter) {
 			a.addSpeakerVocabulary(emitter.Callsign)
 			bullseye := a.radar.BullseyeOf(orb.Point{emitter.Lon, emitter.Lat})
@@ -400,5 +442,25 @@ func (a *Application) handleATCRequest(ctx context.Context, request *brevity.ATC
 	}
 	if err := a.missionLink.SendATC(message); err != nil {
 		log.Warn().Err(err).Msg("failed to pass ATC call to the mission")
+	}
+}
+
+// handleELINTRequest passes a call to a mission ELINT speaker to the mission, which answers with a
+// say message on the frequency it was heard on.
+func (a *Application) handleELINTRequest(ctx context.Context, request *brevity.ELINTRequest) {
+	if a.missionLink == nil {
+		return
+	}
+	message := missionlink.ELINTRequest{
+		Kind:     string(request.Kind),
+		Callsign: request.Callsign,
+		Speaker:  request.Speaker,
+		Bearing:  request.Bearing,
+	}
+	if frequency, ok := heardFrequencyFrom(ctx); ok {
+		message.Frequency = frequency.String()
+	}
+	if err := a.missionLink.SendELINT(message); err != nil {
+		log.Warn().Err(err).Msg("failed to pass ELINT call to the mission")
 	}
 }
