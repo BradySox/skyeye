@@ -201,10 +201,15 @@ func (a *Application) applyPackages(packages missionlink.Packages) {
 	if packages.GCICallsign != "" {
 		a.parser.SetCallsign(packages.GCICallsign)
 		a.speakersLock.Lock()
+		changed := a.composer.Callsign != packages.GCICallsign
 		a.composer.Callsign = packages.GCICallsign
 		a.speakersLock.Unlock()
-		log.Info().Str("callsign", packages.GCICallsign).Msg("mission set the GCI callsign")
+		if changed {
+			log.Info().Str("callsign", packages.GCICallsign).Msg("mission set the GCI callsign")
+		}
+		a.gciCallsignOnce.Do(func() { close(a.gciCallsignSet) })
 	}
+	a.applyPilots(packages.Pilots)
 	if voice, ok := parseVoice(packages.GCIVoice); ok {
 		a.speakersLock.Lock()
 		a.gciVoice = voice
@@ -231,6 +236,19 @@ func (a *Application) applyPackages(packages missionlink.Packages) {
 		}
 		v.packageCallsigns = callsigns
 	})
+}
+
+// applyPilots lets the GCI find each player by the flight callsign they fly: "Ford 9-1" is the
+// player "Flash", and the flight alone, "Ford 9", is its lead.
+func (a *Application) applyPilots(pilots []missionlink.Pilot) {
+	if len(pilots) == 0 {
+		return
+	}
+	aliases := make(map[string]string, len(pilots))
+	for _, pilot := range pilots {
+		aliases[pilot.Callsign] = pilot.Name
+	}
+	a.radar.SetCallsignAliases(aliases)
 }
 
 func (a *Application) applyATC(atc missionlink.ATC) {

@@ -107,7 +107,15 @@ type Application struct {
 
 	// exitAfter is the duration after which the application should exit
 	exitAfter time.Duration
+
+	// gciCallsignSet closes when the mission link first sets the GCI callsign, which releases the
+	// held sunrise call. gciCallsignOnce closes it once.
+	gciCallsignSet  chan struct{}
+	gciCallsignOnce sync.Once
 }
+
+// sunriseHold is how long the sunrise call waits for the mission to name the GCI.
+const sunriseHold = 90 * time.Second
 
 // NewApplication constructs a new Application.
 func NewApplication(config conf.Configuration) (*Application, error) {
@@ -270,12 +278,15 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 	}
 
 	var link *missionlink.Link
+	gciCallsignSet := make(chan struct{})
 	if config.MissionLinkAddress != "" {
 		log.Info().Str("address", config.MissionLinkAddress).Msg("constructing mission link")
 		link, err = missionlink.Listen(config.MissionLinkAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct application: %w", err)
 		}
+		// A mission renames the GCI a second or two after it loads: the sunrise names that callsign.
+		gciController.HoldSunrise(gciCallsignSet, sunriseHold)
 	}
 
 	log.Info().Msg("constructing application")
@@ -305,6 +316,7 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		updates:                    updates,
 		fades:                      fades,
 		exitAfter:                  config.ExitAfter,
+		gciCallsignSet:             gciCallsignSet,
 	}
 	return app, nil
 }

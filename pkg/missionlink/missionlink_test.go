@@ -186,3 +186,12 @@ func TestLinkSendsELINTRequestsToTheSpeaker(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `{"type":"elintRequest","kind":"mud","callsign":"ford 9","speaker":"vacuum","bearing":"270","frequency":"262.000AM"}`, string(buf[:n]))
 }
+
+// The mission names each player's flight callsign, so the GCI finds "Ford 9-1" when the player is
+// "Flash".
+func TestPackagesCarryPilots(t *testing.T) {
+	t.Parallel()
+	var packages Packages
+	require.NoError(t, json.Unmarshal([]byte(`{"type":"packages","controllers":[],"packages":[],"pilots":[{"name":"Flash","callsign":"Ford 9-1"}]}`), &packages))
+	require.Equal(t, []Pilot{{Name: "Flash", Callsign: "Ford 9-1"}}, packages.Pilots)
+}

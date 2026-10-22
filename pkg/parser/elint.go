@@ -37,13 +37,32 @@ func (p *Parser) speakerList() []string {
 // maxSpeakerWords is how many words a heard speaker callsign may take: "vac you um".
 const maxSpeakerWords = 3
 
-// matchSpeaker finds a speaker callsign at the start of a call.
+// isSpeaker is the speaker callsign the words make, if any.
+func isSpeaker(words []string, speakers []string) (string, bool) {
+	candidate := strings.Join(words, "")
+	for _, s := range speakers {
+		if candidate == s || (len(candidate) >= 4 && isSimilar(candidate, s)) {
+			return s, true
+		}
+	}
+	return "", false
+}
+
+// matchSpeaker finds a speaker callsign at the start of a call, or after a pilot callsign with a
+// number, as the GCI's is found: "Ford 9, Vacuum, say emitters". rest is the call without it.
 func matchSpeaker(fields []string, speakers []string) (speaker string, rest []string, ok bool) {
 	for i := 0; i < len(fields) && i < maxSpeakerWords; i++ {
-		candidate := strings.Join(fields[:i+1], "")
-		for _, s := range speakers {
-			if candidate == s || (len(candidate) >= 4 && isSimilar(candidate, s)) {
-				return s, fields[i+1:], true
+		if s, ok := isSpeaker(fields[:i+1], speakers); ok {
+			return s, fields[i+1:], true
+		}
+	}
+	for start := 1; start <= maxCallsignWordsBeforeController && start < len(fields); start++ {
+		if !hasDigits(fields[:start]) || hasDigits(fields[start:start+1]) {
+			continue
+		}
+		for n := 1; n <= maxSpeakerWords && start+n <= len(fields); n++ {
+			if s, ok := isSpeaker(fields[start:start+n], speakers); ok {
+				return s, append(slices.Clone(fields[:start]), fields[start+n:]...), true
 			}
 		}
 	}
@@ -141,7 +160,7 @@ func findELINTRequest(fields []string) (kind brevity.ELINTRequestKind, start int
 }
 
 // elintCallsign reads the pilot callsign from the words before the request, dropping lead-ins
-// and filler, and a callsign said twice ("Ford 9, Ford 9").
+// and filler, a callsign said twice ("Ford 9, Ford 9"), and words after its digits ("two ship").
 func elintCallsign(fields []string) string {
 	words := make([]string, 0, len(fields))
 	for _, w := range fields {
@@ -154,7 +173,7 @@ func elintCallsign(fields []string) string {
 			words = words[:j+1]
 		}
 	}
-	callsign, ok := callsigns.ParsePilotCallsign(numwords.ParseString(strings.Join(words, " ")))
+	callsign, ok := callsigns.ParsePilotCallsign(leadingCallsign(numwords.ParseString(strings.Join(words, " "))))
 	if !ok {
 		return ""
 	}
@@ -185,6 +204,9 @@ func (p *Parser) ParseELINT(tx string, onFrequencyOf string) *brevity.ELINTReque
 		if !anyface {
 			lead := fields[:min(len(fields), maxSpeakerWords)]
 			if _, _, _, ok := p.findControllerCallsign(lead); ok {
+				return nil
+			}
+			if _, _, _, ok := p.findControllerAfterCallsign(fields); ok {
 				return nil
 			}
 		}
