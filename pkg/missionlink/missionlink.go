@@ -61,6 +61,17 @@ type Packages struct {
 	// StrikeThreatsOnly keeps the GCI on strike to threat calls: no merges, and answers to calls
 	// heard on strike go out on the GCI's own frequencies.
 	StrikeThreatsOnly bool `json:"strikeThreatsOnly,omitempty"`
+	// Pilots are the players in the mission's flights, so the GCI finds a player by the flight
+	// callsign they say when their in-game name is something else.
+	Pilots []Pilot `json:"pilots,omitempty"`
+}
+
+// Pilot is a player and the flight callsign they fly.
+type Pilot struct {
+	// Name is the player's in-game name, such as "Flash".
+	Name string `json:"name"`
+	// Callsign is the seat they fly, such as "Ford 9-1".
+	Callsign string `json:"callsign"`
 }
 
 // Say asks SkyEye to speak a line on a frequency.

@@ -17,6 +17,13 @@ func (r *Radar) FindCallsign(callsign string, coalition coalitions.Coalition) (s
 	return foundCallsign, tf
 }
 
+// SetCallsignAliases lets FindCallsign find a player by the flight callsign they fly, such as "Ford
+// 9-1", when their in-game name is something else, such as "Flash". Keys are callsigns, values the
+// in-game names. Each call replaces the last.
+func (r *Radar) SetCallsignAliases(aliases map[string]string) {
+	r.contacts.setAliases(aliases)
+}
+
 // FindUnit returns the trackfile for the given unit ID, or nil if no trackfile was found.
 func (r *Radar) FindUnit(id uint64) *trackfiles.Trackfile {
 	trackfile, ok := r.contacts.getByID(id)

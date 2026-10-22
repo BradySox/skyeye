@@ -151,3 +151,12 @@ func TestLinkRoutesRepliesByOwner(t *testing.T) {
 	require.NoError(t, link.Send(Request{Kind: "checkin", Callsign: "viper 1 1", Controller: "anvil"}))
 	require.Equal(t, TypeRequest, read(pkgcontrol)["type"])
 }
+
+// The mission names each player's flight callsign, so the GCI finds "Ford 9-1" when the player is
+// "Flash".
+func TestPackagesCarryPilots(t *testing.T) {
+	t.Parallel()
+	var packages Packages
+	require.NoError(t, json.Unmarshal([]byte(`{"type":"packages","controllers":[],"packages":[],"pilots":[{"name":"Flash","callsign":"Ford 9-1"}]}`), &packages))
+	require.Equal(t, []Pilot{{Name: "Flash", Callsign: "Ford 9-1"}}, packages.Pilots)
+}

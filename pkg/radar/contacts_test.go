@@ -267,3 +267,35 @@ func TestValues(t *testing.T) {
 	assert.True(t, foundMobius)
 	assert.True(t, foundYellow)
 }
+
+// A player whose in-game name is not their flight callsign is found by the callsign the mission
+// says they fly.
+func TestGetByCallsignAlias(t *testing.T) {
+	t.Parallel()
+	db := newContactDatabase()
+	trackfile := trackfiles.New(trackfiles.Labels{
+		ID:        1,
+		Name:      "Flash",
+		Coalition: coalitions.Blue,
+		ACMIName:  "F-16C_50",
+	})
+	db.set(trackfile)
+
+	_, _, ok := db.getByCallsignAndCoalititon("ford 9 1", coalitions.Blue)
+	require.False(t, ok)
+
+	db.setAliases(map[string]string{"Ford 9-1": "Flash", "Ford 9": "Flash"})
+	for _, heard := range []string{"ford 9 1", "ford 9"} {
+		name, tf, ok := db.getByCallsignAndCoalititon(heard, coalitions.Blue)
+		require.True(t, ok, heard)
+		assert.Equal(t, heard, name)
+		assert.Equal(t, trackfile, tf)
+	}
+	_, _, ok = db.getByCallsignAndCoalititon("ford 9 1", coalitions.Red)
+	require.False(t, ok)
+
+	name, tf, ok := db.getByCallsignAndCoalititon("flash", coalitions.Blue)
+	require.True(t, ok)
+	assert.Equal(t, "flash", name)
+	assert.Equal(t, trackfile, tf)
+}

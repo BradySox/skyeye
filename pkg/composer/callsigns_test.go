@@ -14,20 +14,32 @@ func TestComposeCallsigns(t *testing.T) {
 		expected  []string
 	}{
 		{
+			callsigns: []string{"uzi 2 1"},
+			expected:  []string{"Uzi 2 1"},
+		},
+		{
+			callsigns: []string{"UZI 2 1"},
+			expected:  []string{"Uzi 2 1"},
+		},
+		{
+			callsigns: []string{"McFly 1"},
+			expected:  []string{"McFly 1"},
+		},
+		{
 			callsigns: []string{"Alpha 1"},
-			expected:  []string{"ALPHA 1"},
+			expected:  []string{"Alpha 1"},
 		},
 		{
 			callsigns: []string{"Alpha 1", "Bravo 1", "Charlie 1"},
-			expected:  []string{"ALPHA 1, BRAVO 1, CHARLIE 1"},
+			expected:  []string{"Alpha 1, Bravo 1, Charlie 1"},
 		},
 		{
 			callsigns: []string{"Alpha 2", "Alpha 1", "Alpha 3"},
-			expected:  []string{"ALPHA 2, ALPHA 1, ALPHA 3"},
+			expected:  []string{"Alpha 2, Alpha 1, Alpha 3"},
 		},
 		{
 			callsigns: []string{"Charlie 1 1", "Alpha 1 2", "Bravo 1 2", "Bravo 1 1", "Alpha 1 1"},
-			expected:  []string{"CHARLIE 1 1", "ALPHA 1 2", "BRAVO 1 2", "BRAVO 1 1", "ALPHA 1 1"},
+			expected:  []string{"Charlie 1 1", "Alpha 1 2", "Bravo 1 2", "Bravo 1 1", "Alpha 1 1"},
 		},
 	}
 	c := &Composer{"Tester"}
