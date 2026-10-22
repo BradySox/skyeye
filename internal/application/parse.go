@@ -39,6 +39,9 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 		if call := parser.ParseATC(text, loose); call != nil {
 			request = call
 		}
+	} else if call := a.parser.ParseELINT(text, a.elintSpeakerOn(ctx)); call != nil {
+		// A call to Vacuum is the mission's to answer, never the GCI's.
+		request = call
 	} else {
 		request = a.parser.Parse(text)
 		if request == nil && a.heardOnLooseStrike(ctx) {

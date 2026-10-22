@@ -151,3 +151,38 @@ func TestLinkRoutesRepliesByOwner(t *testing.T) {
 	require.NoError(t, link.Send(Request{Kind: "checkin", Callsign: "viper 1 1", Controller: "anvil"}))
 	require.Equal(t, TypeRequest, read(pkgcontrol)["type"])
 }
+
+// A tune that names a speaker gets the ELINT requests for it; a plain tune does not.
+func TestLinkSendsELINTRequestsToTheSpeaker(t *testing.T) {
+	t.Parallel()
+	link, err := Listen("127.0.0.1:0")
+	require.NoError(t, err)
+	tuneCh := make(chan Tune, 2)
+	go link.Run(t.Context(), Handlers{OnTune: func(m Tune) { tuneCh <- m }})
+	skyeye, ok := link.Addr().(*net.UDPAddr)
+	require.True(t, ok)
+	vacuum, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err)
+	defer vacuum.Close()
+
+	_, err = vacuum.WriteToUDP([]byte(`{"type":"tune","frequencies":["262.000AM"]}`), skyeye)
+	require.NoError(t, err)
+	<-tuneCh
+	require.ErrorContains(t, link.SendELINT(ELINTRequest{Kind: "emitters"}), "no mission")
+
+	_, err = vacuum.WriteToUDP([]byte(`{"type":"tune","frequencies":["262.000AM","264.500AM"],"callsign":"Vacuum","frequency":"262.000AM"}`), skyeye)
+	require.NoError(t, err)
+	select {
+	case tune := <-tuneCh:
+		require.Equal(t, Tune{Type: TypeTune, Frequencies: []string{"262.000AM", "264.500AM"}, Callsign: "Vacuum", Frequency: "262.000AM"}, tune)
+	case <-time.After(2 * time.Second):
+		t.Fatal("no tune message")
+	}
+
+	require.NoError(t, link.SendELINT(ELINTRequest{Kind: "mud", Callsign: "ford 9", Speaker: "vacuum", Bearing: "270", Frequency: "262.000AM"}))
+	require.NoError(t, vacuum.SetReadDeadline(time.Now().Add(2*time.Second)))
+	buf := make([]byte, 2048)
+	n, _, err := vacuum.ReadFromUDP(buf)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"type":"elintRequest","kind":"mud","callsign":"ford 9","speaker":"vacuum","bearing":"270","frequency":"262.000AM"}`, string(buf[:n]))
+}

@@ -5,7 +5,8 @@
 // controllers and lines to speak. SkyEye sends the mission the requests it heard. Messages are one
 // JSON object per UDP datagram. Several mission scripts may share the link, each from its own
 // socket: package requests go to the address the last packages message came from, ATC requests to
-// the address the last atc message came from.
+// the address the last atc message came from, ELINT requests to the address the last tune message
+// naming a speaker came from.
 package missionlink
 
 import (
@@ -29,7 +30,12 @@ const (
 	TypeATC      = "atc"
 	// TypeATCRequest is an ATC call SkyEye heard, sent to the mission.
 	TypeATCRequest = "atcRequest"
+	// TypeELINTRequest is a call to a mission ELINT speaker SkyEye heard, sent to the mission.
+	TypeELINTRequest = "elintRequest"
 )
+
+// peerELINT is the peer that tunes for an ELINT speaker.
+const peerELINT = "elint"
 
 // maxDatagram is the largest message accepted.
 const maxDatagram = 64 * 1024
@@ -79,6 +85,12 @@ type Say struct {
 type Tune struct {
 	Type        string   `json:"type"`
 	Frequencies []string `json:"frequencies"`
+	// Callsign names a mission ELINT speaker, such as "Vacuum", that answers calls: SkyEye passes
+	// calls to it heard on these frequencies to the mission as ELINT requests. Empty for none.
+	Callsign string `json:"callsign,omitempty"`
+	// Frequency is the speaker's own frequency, one of Frequencies. There a call that names no
+	// one, or ANYFACE, is for the speaker.
+	Frequency string `json:"frequency,omitempty"`
 }
 
 // Emitter asks SkyEye to report a radiating ground emitter with a bullseye call. SkyEye works out
@@ -134,6 +146,21 @@ type ATCRequest struct {
 	Detail    string `json:"detail,omitempty"`
 	Numbers   string `json:"numbers"`
 	Text      string `json:"text"`
+	Frequency string `json:"frequency"`
+}
+
+// ELINTRequest is a call to a mission ELINT speaker SkyEye heard, sent to the mission. Every field
+// is a flat string, so the mission script can read them simply.
+type ELINTRequest struct {
+	Type string `json:"type"`
+	// Kind is "checkin", "emitters", "target", "mud", "sayagain" or "unknown".
+	Kind     string `json:"kind"`
+	Callsign string `json:"callsign"`
+	// Speaker is the callsign called, such as "vacuum".
+	Speaker string `json:"speaker"`
+	// Bearing is the magnetic bearing of a mud request, such as "270".
+	Bearing string `json:"bearing,omitempty"`
+	// Frequency the call was heard on; the mission answers on it.
 	Frequency string `json:"frequency"`
 }
 
@@ -237,6 +264,9 @@ func (l *Link) handle(b []byte, from *net.UDPAddr, handlers Handlers) {
 			log.Warn().Err(err).Msg("ignoring unreadable tune message")
 			return
 		}
+		if tune.Callsign != "" {
+			l.setPeer(peerELINT, from)
+		}
 		if handlers.OnTune != nil && len(tune.Frequencies) > 0 {
 			handlers.OnTune(tune)
 		}
@@ -297,4 +327,11 @@ func (l *Link) Send(request Request) error {
 func (l *Link) SendATC(request ATCRequest) error {
 	request.Type = TypeATCRequest
 	return l.sendTo(TypeATC, request)
+}
+
+// SendELINT sends an ELINT request to the mission. It fails if no tune message naming a speaker has
+// arrived yet.
+func (l *Link) SendELINT(request ELINTRequest) error {
+	request.Type = TypeELINTRequest
+	return l.sendTo(peerELINT, request)
 }

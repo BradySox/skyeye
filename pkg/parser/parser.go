@@ -37,6 +37,10 @@ type Parser struct {
 	// calls are passed to the mission as PackageRequests. Set at runtime by the mission link.
 	packageControllers     []string
 	packageControllersLock sync.RWMutex
+	// speakers are the mission's ELINT speakers, such as Vacuum, lowercased without spaces. Their
+	// calls are parsed by ParseELINT, never as GCI or package calls. Guarded by
+	// packageControllersLock.
+	speakers []string
 }
 
 // SetPackageControllers replaces the package controller callsigns the parser listens for.
