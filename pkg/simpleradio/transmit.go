@@ -17,16 +17,18 @@ func (c *Client) Transmit(transmission Transmission) {
 }
 
 // transmitPackets transmits voice packets from queued transmissions to the SRS server.
-func (c *Client) transmitPackets(ctx context.Context, packetChan <-chan []voice.Packet) {
+// A voice's packets go out on the voice's own connection, so SRS shows the voice as the sender.
+func (c *Client) transmitPackets(ctx context.Context, packetChan <-chan outgoing) {
 	for {
 		select {
-		case packets := <-packetChan:
+		case out := <-packetChan:
 			func() {
-				c.txLock.Lock()
-				defer c.txLock.Unlock()
+				lock := c.transmitLock()
+				lock.Lock()
+				defer lock.Unlock()
 				c.waitForClearChannel()
 				if !c.mute {
-					c.writePackets(packets)
+					out.from.writePackets(out.packets)
 				}
 			}()
 			// Pause between transmissions to sound more natural.

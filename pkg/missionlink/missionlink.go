@@ -90,6 +90,10 @@ type Say struct {
 	Speech string `json:"speech,omitempty"`
 	// Voice is "feminine" or "masculine"; empty uses SkyEye's own voice.
 	Voice string `json:"voice,omitempty"`
+	// Speaker is who speaks the line, such as "Hatzerim Ground", "Blackjack" or "Vacuum". SkyEye
+	// sends it under that name in SRS. Empty picks the one speaker the mission said talks on the
+	// frequency, else SkyEye's own name.
+	Speaker string `json:"speaker,omitempty"`
 }
 
 // Tune asks SkyEye to join more frequencies to speak on, leaving the package controllers alone.

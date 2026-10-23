@@ -34,6 +34,9 @@ func (a *Application) transmitMessage(rCtx context.Context, audio simpleradio.Au
 	} else if strike, ok := a.strikeFrequency(); ok && isImportant(rCtx) {
 		transmission.Frequencies = append(a.srsClient.Frequencies(), strike)
 	}
+	if from := a.botClientFor(rCtx); from != nil {
+		transmission.From = from
+	}
 
 	log.Info().Str("traceID", transmission.TraceID).Msg("transmitting audio")
 	a.srsClient.Transmit(transmission)

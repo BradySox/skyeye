@@ -187,11 +187,13 @@ func (a *Application) applyPackages(packages missionlink.Packages) {
 	a.strikeThreatsOnly = packages.StrikeThreatsOnly
 	a.speakersLock.Unlock()
 	frequencies := make([]simpleradio.RadioFrequency, 0, len(packages.Packages)+1)
+	var strike *simpleradio.RadioFrequency
 	if packages.Strike != "" {
-		strike, err := simpleradio.ParseRadioFrequency(packages.Strike)
+		parsed, err := simpleradio.ParseRadioFrequency(packages.Strike)
 		if err != nil {
 			log.Warn().Err(err).Str("frequency", packages.Strike).Msg("ignoring unreadable strike frequency")
 		} else {
+			strike = parsed
 			frequencies = append(frequencies, *strike)
 			a.speakersLock.Lock()
 			a.strike = strike
@@ -206,6 +208,10 @@ func (a *Application) applyPackages(packages missionlink.Packages) {
 		a.speakersLock.Unlock()
 		if changed {
 			log.Info().Str("callsign", packages.GCICallsign).Msg("mission set the GCI callsign")
+		}
+		a.bots.setMain(packages.GCICallsign)
+		if err := a.srsClient.SetName(botClientName(packages.GCICallsign)); err != nil {
+			log.Warn().Err(err).Msg("failed to rename the SRS client to the GCI callsign")
 		}
 		a.gciCallsignOnce.Do(func() { close(a.gciCallsignSet) })
 	}
@@ -226,6 +232,7 @@ func (a *Application) applyPackages(packages missionlink.Packages) {
 	if err := a.srsClient.AddListenRadios(frequencies); err != nil {
 		log.Error().Err(err).Msg("failed to tune package frequencies")
 	}
+	a.applyPackageVoices(packages.Controllers, strike, frequencies)
 	callsigns := slices.Clone(packages.Controllers)
 	for _, pkg := range packages.Packages {
 		callsigns = append(callsigns, pkg.Name)
@@ -253,6 +260,7 @@ func (a *Application) applyPilots(pilots []missionlink.Pilot) {
 
 func (a *Application) applyATC(atc missionlink.ATC) {
 	var frequencies []simpleradio.RadioFrequency
+	var stations []botClaim
 	for _, field := range atc.Fields {
 		for _, position := range field.Positions {
 			frequency, err := simpleradio.ParseRadioFrequency(position.Frequency)
@@ -261,6 +269,7 @@ func (a *Application) applyATC(atc missionlink.ATC) {
 				continue
 			}
 			frequencies = append(frequencies, *frequency)
+			stations = append(stations, botClaim{frequency: *frequency, speaker: atcSpeakerName(field.Name, position.Position)})
 		}
 	}
 	a.speakersLock.Lock()
@@ -270,6 +279,7 @@ func (a *Application) applyATC(atc missionlink.ATC) {
 	if err := a.srsClient.AddListenRadios(frequencies); err != nil {
 		log.Error().Err(err).Msg("failed to tune ATC frequencies")
 	}
+	a.applyATCVoices(stations)
 	fields := make([]string, 0, len(atc.Fields))
 	for _, field := range atc.Fields {
 		fields = append(fields, field.Name)
@@ -314,13 +324,16 @@ func (a *Application) applyTune(tune missionlink.Tune) {
 	a.parser.SetSpeaker(tune.Callsign)
 	a.addSpeakerVocabulary(tune.Callsign)
 	if tune.Frequency == "" {
+		a.applyTuneVoice(tune.Callsign, nil, frequencies)
 		return
 	}
 	own, err := simpleradio.ParseRadioFrequency(tune.Frequency)
 	if err != nil {
 		log.Warn().Err(err).Str("frequency", tune.Frequency).Msg("ignoring unreadable speaker frequency")
+		a.applyTuneVoice(tune.Callsign, nil, frequencies)
 		return
 	}
+	a.applyTuneVoice(tune.Callsign, own, frequencies)
 	a.speakersLock.Lock()
 	defer a.speakersLock.Unlock()
 	if a.elintFrequencies == nil {
@@ -368,6 +381,7 @@ func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[com
 				}
 				rCtx := traces.WithTraceID(traces.NewRequestContext(), shortuuid.New())
 				rCtx = withFrequency(traces.WithRequestText(rCtx, response.Subtitle), frequency)
+				rCtx = withSpeaker(rCtx, emitter.Callsign)
 				if voice, ok := parseVoice(emitter.Voice); ok {
 					rCtx = withVoice(rCtx, voice)
 				}
@@ -388,6 +402,7 @@ func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[com
 			}
 			rCtx := traces.WithTraceID(traces.NewRequestContext(), shortuuid.New())
 			rCtx = withFrequency(traces.WithRequestText(rCtx, say.Text), frequency)
+			rCtx = withSpeaker(rCtx, say.Speaker)
 			if voice, ok := parseVoice(say.Voice); ok {
 				rCtx = withVoice(rCtx, voice)
 			}

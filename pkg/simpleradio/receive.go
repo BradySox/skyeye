@@ -113,6 +113,11 @@ func (c *Client) receiveVoice(ctx context.Context, in <-chan []byte, out chan<- 
 
 			logger := log.With().Str("GUID", string(packet.OriginGUID)).Logger()
 
+			if c.isOwnVoice(types.GUID(packet.OriginGUID)) {
+				// SRS routes a voice's call to this client too; it is not a call to answer.
+				continue
+			}
+
 			if c.secureCoalitionRadios.Load() {
 				client, ok := c.clients[types.GUID(packet.OriginGUID)]
 				if !ok {

@@ -55,11 +55,12 @@ func (c *Client) decodeVoice(ctx context.Context, voicePacketsChan <-chan []voic
 }
 
 // encodeVoice encodes audio from the client's txChan and publishes an entire transmission's worth of voice packets to packetCh.
-func (c *Client) encodeVoice(ctx context.Context, packetChan chan<- []voice.Packet) {
+func (c *Client) encodeVoice(ctx context.Context, packetChan chan<- outgoing) {
 	for {
 		select {
 		case transmission := <-c.txChan:
 			frequencyList := c.transmitFrequencies(transmission)
+			sender := c.senderFor(transmission)
 			encoder, err := opus.NewEncoder(int(rate.Wideband.Hertz()), channels, opusApplicationVoIP)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to create Opus encoder")
@@ -87,20 +88,20 @@ func (c *Client) encodeVoice(ctx context.Context, packetChan chan<- []voice.Pack
 					continue
 				}
 
-				guid := c.clientInfo.GUID
+				guid := sender.clientInfo.GUID
 				voicePacket := voice.NewPacket(
 					audioBytes,
 					frequencyList,
 					100000002,
-					c.packetNumber,
+					sender.packetNumber,
 					0,
 					[]byte(guid),
 					[]byte(guid),
 				)
-				c.packetNumber++
+				sender.packetNumber++
 				txPackets = append(txPackets, voicePacket)
 			}
-			packetChan <- txPackets
+			packetChan <- outgoing{from: sender, packets: txPackets}
 		case <-ctx.Done():
 			log.Info().Msg("stopping voice encoder due to context cancellation")
 			return
