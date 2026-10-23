@@ -64,8 +64,12 @@ func (c *Client) AddListenRadios(frequencies []RadioFrequency) error {
 }
 
 // resyncRadios sends the client's full radio list to the SRS server the way a fresh connection
-// does: a sync, then the External AWACS Mode login, both carrying every radio.
+// does: a sync, then the External AWACS Mode login, both carrying every radio. It holds txLock so
+// the re-login never lands while a call is on the air: a call that aired the same minute as one
+// went unheard (2026-10-22).
 func (c *Client) resyncRadios() error {
+	c.txLock.Lock()
+	defer c.txLock.Unlock()
 	if err := c.sync(); err != nil {
 		return err
 	}

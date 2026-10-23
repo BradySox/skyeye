@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/dharmab/skyeye/pkg/simpleradio/types"
 	"github.com/dharmab/skyeye/pkg/simpleradio/voice"
@@ -102,4 +103,53 @@ func TestAddListenRadiosResyncsWithServer(t *testing.T) {
 		sent = append(sent, message.Type)
 	}
 	require.Equal(t, []types.MessageType{types.MessageSync, types.MessageExternalAWACSModePassword}, sent)
+}
+
+// A re-login while a call is on the air cost that call (2026-10-22), so the resync waits for the
+// transmit lock.
+func TestAddListenRadiosWaitsForTransmission(t *testing.T) {
+	t.Parallel()
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err)
+	defer listener.Close()
+	accepted := make(chan *net.TCPConn, 1)
+	go func() {
+		conn, acceptErr := listener.AcceptTCP()
+		if acceptErr == nil {
+			accepted <- conn
+		}
+	}()
+	conn, err := net.DialTCP("tcp", nil, listener.Addr().(*net.TCPAddr))
+	require.NoError(t, err)
+	defer conn.Close()
+	server := <-accepted
+	defer server.Close()
+
+	c := newSyncTestClient()
+	c.receivers = map[types.Radio]*receiver{testRadio: {}}
+	c.tcpConnection = conn
+	c.externalAWACSModePassword = "hunter2"
+
+	c.txLock.Lock()
+	done := make(chan error, 1)
+	go func() { done <- c.AddListenRadios([]RadioFrequency{testPackageFrequency}) }()
+
+	require.NoError(t, server.SetReadDeadline(time.Now().Add(300*time.Millisecond)))
+	reader := bufio.NewReader(server)
+	_, readErr := reader.ReadBytes('\n')
+	require.Error(t, readErr, "resync was sent while a transmission held the lock")
+	select {
+	case <-done:
+		t.Fatal("AddListenRadios returned while a transmission held the lock")
+	default:
+	}
+
+	c.txLock.Unlock()
+	require.NoError(t, <-done)
+	require.NoError(t, server.SetReadDeadline(time.Now().Add(2*time.Second)))
+	line, readErr := reader.ReadBytes('\n')
+	require.NoError(t, readErr)
+	var message types.Message
+	require.NoError(t, json.Unmarshal(line, &message))
+	require.Equal(t, types.MessageSync, message.Type)
 }
