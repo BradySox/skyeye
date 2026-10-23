@@ -28,6 +28,8 @@ func TestPromptMissionVocabulary(t *testing.T) {
 	assert.Contains(t, p, "Airfields: Hatzerim, Nevatim.")
 	assert.Contains(t, p, "Locations: Tel Aviv.")
 	assert.Contains(t, p, "ready for takeoff")
+	// ATC gives no squawk codes, so the prompt does not steer toward one.
+	assert.NotContains(t, strings.ToLower(p), "squawk")
 	assert.Contains(t, p, "Check in")
 	// The mission's words come last, nearest the transcript.
 	assert.True(t, strings.HasSuffix(p, "Airfields: Hatzerim, Nevatim."))

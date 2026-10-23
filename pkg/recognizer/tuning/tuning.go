@@ -16,8 +16,8 @@ const MaxPromptChars = 600
 // uses every logical CPU, which on a 28-thread desktop running DCS slows recognition down.
 const DefaultThreads = 8
 
-// atcWords are the words of a Ground or Tower call.
-const atcWords = "Ground, Tower, request taxi, holding short, ready for takeoff, runway, squawk, inbound, outbound, full stop."
+// atcWords are the words of a Ground or Tower call. No squawk: RetLab's ATC gives no codes.
+const atcWords = "Ground, Tower, request taxi, holding short, ready for takeoff, runway, inbound, outbound, full stop."
 
 // packageWords are the words of a package call.
 const packageWords = "Check in, checking in, package, on station."
