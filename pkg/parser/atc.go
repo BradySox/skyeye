@@ -327,7 +327,8 @@ func isAirborne(tokens []string) bool {
 }
 
 // isReadback is true for a call that repeats a clearance back: "Viper 1-1, cleared for takeoff",
-// "Viper 1-1, squawk 4101, hold short 25". A request in it makes it a request instead.
+// "Viper 1-1, hold short 25". ATC gives no squawk, but a readback that says one still counts.
+// A request in it makes it a request instead.
 func isReadback(tokens []string) bool {
 	if hasToken(tokens, "request", "requesting", "ready", "holding", "inbound", "airborne") {
 		return false

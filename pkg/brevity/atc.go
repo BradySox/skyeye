@@ -40,7 +40,7 @@ type ATCRequest struct {
 	Kind ATCRequestKind
 	// Detail qualifies the kind: "overhead" for an inbound flight asking for the overhead break.
 	Detail string
-	// Numbers are the numbers heard, in order, without the callsign's: a runway, a squawk code,
+	// Numbers are the numbers heard, in order, without the callsign's: a runway or
 	// a frequency such as "270.45". The mission checks a readback against them.
 	Numbers []string
 	// Text is the normalized call, for the mission to check words such as a taxiway name.
