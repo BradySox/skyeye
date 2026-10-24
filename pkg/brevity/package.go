@@ -10,6 +10,8 @@ const (
 	PackageReadyToPush PackageRequestKind = "ready"
 	// PackagePushTime is a flight asking for the current push time.
 	PackagePushTime PackageRequestKind = "pushtime"
+	// PackageAirborne is a flight reporting airborne after takeoff.
+	PackageAirborne PackageRequestKind = "airborne"
 	// PackageUnknown is a call to a package controller that names no request SkyEye knows. The
 	// mission answers it with a say again in the controller's voice.
 	PackageUnknown PackageRequestKind = "unknown"
