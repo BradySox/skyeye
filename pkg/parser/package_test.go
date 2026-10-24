@@ -9,7 +9,7 @@ import (
 
 func newPackageParser() *Parser {
 	p := New(TestCallsign, []string{}, true)
-	p.SetPackageControllers([]string{"Darkstar"})
+	p.SetPackageControllers([]string{"Darkstar", "Ramrod"})
 	return p
 }
 
@@ -35,6 +35,26 @@ func TestParserPackageRequests(t *testing.T) {
 		{
 			text:     "Darkstar Colt 1 1 push time",
 			expected: &brevity.PackageRequest{Callsign: "colt 1 1", Controller: "darkstar", Kind: brevity.PackagePushTime},
+		},
+		{
+			text:     "- Ramrod, Chevy 2, flight is airborne.",
+			expected: &brevity.PackageRequest{Callsign: "chevy 2", Controller: "ramrod", Kind: brevity.PackageAirborne},
+		},
+		{
+			text:     "Ramrod, Chevy 2-1, wheels up.",
+			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageAirborne},
+		},
+		{
+			text:     "Ramrod, Chevy 2-1, off the ground.",
+			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageAirborne},
+		},
+		{
+			text:     "Ramrod, Chevy 2-1, departing.",
+			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageAirborne},
+		},
+		{
+			text:     "Ramrod, Chevy 2-1, airborne, checking in.",
+			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageCheckIn},
 		},
 		{
 			text:     "Skyeye, Colt 1-1, ready to push.",

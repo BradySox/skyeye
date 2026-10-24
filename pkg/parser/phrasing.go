@@ -114,18 +114,104 @@ func (p *Parser) findControllerAfterCallsign(fields []string) (heard string, mat
 	return "", "", "", false
 }
 
+// callsignLeadIns are words a pilot says around the callsign and the request: "Chainsaw, say
+// picture", "uh, request picture", "this is Ford 1 1". They are never a pilot callsign.
+var callsignLeadIns = map[string]bool{
+	"uh": true, "uhh": true, "um": true, "umm": true, "er": true, "erm": true, "ah": true,
+	wordSay: true, wordRequest: true, wordRequesting: true, "give": true, "me": true, "send": true,
+	"whats": true, "what": true, "how": true, "about": true, wordThis: true, "is": true,
+	"the": true, "your": true, "please": true,
+}
+
+const (
+	wordRequesting = "requesting"
+	wordThis       = "this"
+)
+
+// trimLeadIns drops lead-in words from both ends of the words heard as the pilot callsign.
+func trimLeadIns(text string) string {
+	fields := strings.Fields(text)
+	for len(fields) > 0 && callsignLeadIns[fields[0]] {
+		fields = fields[1:]
+	}
+	for len(fields) > 0 && callsignLeadIns[fields[len(fields)-1]] {
+		fields = fields[:len(fields)-1]
+	}
+	return strings.Join(fields, " ")
+}
+
+// sayHomophones are what Whisper writes for "say". They count only before a request word: "safe
+// picture".
+var sayHomophones = map[string]bool{"safe": true}
+
+// fixSayHomophones rewrites a homophone of "say" that comes right before a request word.
+func fixSayHomophones(fields []string) []string {
+	for i := 0; i+1 < len(fields); i++ {
+		if !sayHomophones[fields[i]] {
+			continue
+		}
+		if _, _, ok := findRequestWord(fields[i+1 : i+2]); ok {
+			fields[i] = wordSay
+		}
+	}
+	return fields
+}
+
+// findControllerAfterFlightName finds the controller callsign said after a flight name with no
+// number: "Chevy, Chainsaw, say picture". Only the lead-ins may follow the controller, so the call
+// is a bare request. Returns the heard controller callsign, the wake phrase it matched, the flight
+// name, and whether it was found.
+func (p *Parser) findControllerAfterFlightName(fields []string) (heard string, matched string, pilot string, ok bool) {
+	if len(fields) < 2 || callsignLeadIns[fields[0]] || hasDigits(fields[:1]) {
+		return "", "", "", false
+	}
+	phrases := p.wakePhrases()
+	for n := 1; n <= maxControllerWords && 1+n <= len(fields); n++ {
+		if trimLeadIns(strings.Join(fields[1+n:], " ")) != "" {
+			continue
+		}
+		candidate := strings.Join(fields[1:1+n], " ")
+		for _, wakePhrase := range phrases {
+			if wakePhrase != "" && isSimilar(candidate, strings.ToLower(wakePhrase)) {
+				return candidate, strings.ToLower(wakePhrase), fields[0], true
+			}
+		}
+	}
+	return "", "", "", false
+}
+
 // packageAcknowledgements answer a package controller and need no reply: "Ford 9, copy".
 var packageAcknowledgements = map[string]bool{
 	"copy": true, "copies": true, "wilco": true, "roger": true, "pushing": true, "egressing": true,
 }
 
+// airbornePhrases report a flight off the runway: "Chevy 2, flight is airborne", "wheels up".
+var airbornePhrases = []string{"airborne", "wheels up", "off the ground", "departing"}
+
+// isAirborneReport is true if the call reports the flight airborne.
+func isAirborneReport(tx string) bool {
+	padded := " " + tx + " "
+	for _, phrase := range airbornePhrases {
+		if strings.Contains(padded, " "+phrase+" ") {
+			return true
+		}
+	}
+	return false
+}
+
 // parsePackageCallWithoutRequestWord reads a call to a package controller that names no request
 // word. "Check in" (and its aliases) or a bare "ready", which answers the roll call, is a check-in;
-// an acknowledgement needs no reply; anything else asks the controller to say again, in its own
+// "airborne" or "wheels up" is an airborne report; an acknowledgement needs no reply; anything else asks the controller to say again, in its own
 // voice. Returns nil for an acknowledgement.
 func parsePackageCallWithoutRequestWord(tx, pilotCallsign, controller string) any {
 	fields := strings.Fields(tx)
-	if strings.Contains(tx, checkIn) || strings.Contains(" "+tx+" ", " ready ") {
+	if strings.Contains(tx, checkIn) {
+		return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: controller, Kind: brevity.PackageCheckIn}
+	}
+	if isAirborneReport(tx) {
+		return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: controller, Kind: brevity.PackageAirborne}
+	}
+	if strings.Contains(" "+tx+" ", " ready ") {
 		return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: controller, Kind: brevity.PackageCheckIn}
 	}
 	for _, f := range fields {

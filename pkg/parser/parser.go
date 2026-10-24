@@ -314,7 +314,7 @@ func (p *Parser) Parse(tx string) any {
 	}
 	logger.Debug().Msg("normalized text")
 
-	fields := strings.Fields(tx)
+	fields := fixSayHomophones(strings.Fields(tx))
 
 	before := fields
 	var requestArgs []string
@@ -331,6 +331,9 @@ func (p *Parser) Parse(tx string) any {
 	heard, matched, rest, ok := p.findControllerCallsign(before)
 	if !ok {
 		heard, matched, rest, ok = p.findControllerAfterCallsign(before)
+	}
+	if !ok && requestWord != "" {
+		heard, matched, rest, ok = p.findControllerAfterFlightName(before)
 	}
 
 	if !ok {
@@ -349,7 +352,7 @@ func (p *Parser) Parse(tx string) any {
 	}
 	event.Msg("searching for pilot callsign in rest of text")
 
-	rest = leadingCallsign(numwords.ParseString(rest))
+	rest = trimLeadIns(leadingCallsign(numwords.ParseString(rest)))
 	pilotCallsign, ok := callsigns.ParsePilotCallsign(rest)
 	if ok {
 		logger = logger.With().Str("pilot", pilotCallsign).Logger()
