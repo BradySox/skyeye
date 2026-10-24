@@ -118,10 +118,15 @@ func (p *Parser) findControllerAfterCallsign(fields []string) (heard string, mat
 // picture", "uh, request picture", "this is Ford 1 1". They are never a pilot callsign.
 var callsignLeadIns = map[string]bool{
 	"uh": true, "uhh": true, "um": true, "umm": true, "er": true, "erm": true, "ah": true,
-	"say": true, "request": true, "requesting": true, "give": true, "me": true, "send": true,
-	"whats": true, "what": true, "how": true, "about": true, "this": true, "is": true,
+	wordSay: true, wordRequest: true, wordRequesting: true, "give": true, "me": true, "send": true,
+	"whats": true, "what": true, "how": true, "about": true, wordThis: true, "is": true,
 	"the": true, "your": true, "please": true,
 }
+
+const (
+	wordRequesting = "requesting"
+	wordThis       = "this"
+)
 
 // trimLeadIns drops lead-in words from both ends of the words heard as the pilot callsign.
 func trimLeadIns(text string) string {
@@ -146,7 +151,7 @@ func fixSayHomophones(fields []string) []string {
 			continue
 		}
 		if _, _, ok := findRequestWord(fields[i+1 : i+2]); ok {
-			fields[i] = "say"
+			fields[i] = wordSay
 		}
 	}
 	return fields

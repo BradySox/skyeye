@@ -78,8 +78,8 @@ const (
 // status", "say emitters", "uh, give me emitters". They are never part of the callsign.
 var elintLeadIns = map[string]bool{
 	"uh": true, "uhh": true, "um": true, "umm": true, "er": true, "ah": true, "erm": true,
-	wordSay: true, wordRequest: true, "requesting": true, "give": true, "me": true, "send": true,
-	"whats": true, "what": true, "s": true, "is": true, "how": true, "about": true, "this": true,
+	wordSay: true, wordRequest: true, wordRequesting: true, "give": true, "me": true, "send": true,
+	"whats": true, "what": true, "s": true, "is": true, "how": true, "about": true, wordThis: true,
 	"the": true, "your": true, "please": true, "and": true, "with": true, "copy": true,
 }
 
