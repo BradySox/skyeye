@@ -41,6 +41,8 @@ type Application struct {
 	callsign string
 	// srsClient is a SimpleRadio Standalone client
 	srsClient *simpleradio.Client
+	// bots are the SRS clients the mission's speakers talk through, each under its own name
+	bots *botVoices[*simpleradio.Client]
 	// telemetryClient streams ACMI data
 	telemetryClient telemetry.Client
 	// recognizer provides speech-to-text recognition
@@ -296,6 +298,7 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		enableTranscriptionLogging: config.EnableTranscriptionLogging,
 		chatListener:               chatListener,
 		srsClient:                  srsClient,
+		bots:                       newBotVoices[*simpleradio.Client](maxBotVoices),
 		telemetryClient:            telemetryClient,
 		recognizer:                 speechRecognizer,
 		recognizerLock:             config.RecognizerLock,
@@ -318,6 +321,7 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		exitAfter:                  config.ExitAfter,
 		gciCallsignSet:             gciCallsignSet,
 	}
+	app.bots.setMain(config.Callsign)
 	return app, nil
 }
 
@@ -399,6 +403,9 @@ func (a *Application) Run(ctx context.Context, cancel context.CancelFunc, wg *sy
 		})
 	}
 
+	a.bots.start(func(name string, frequencies []simpleradio.RadioFrequency) (*simpleradio.Client, error) {
+		return a.openBotClient(ctx, wg, name, frequencies)
+	})
 	if a.missionLink != nil {
 		log.Info().Msg("starting mission link routine")
 		wg.Go(func() {

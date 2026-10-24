@@ -262,6 +262,20 @@ SkyEye does not require any inbound ports during runtime.
 
 SkyEye requires a stable connection to the TacView exporter to stream real-time telemetry. If this connection has a data cap, you should monitor the bandwidth usage. If this turns out to be a problem in practice, please create an issue on GitHub and I'll see if I can improve it to meet your needs.
 
+### SRS Client Names
+
+SkyEye joins SRS as `GCI <callsign> [BOT]`. When a mission link names the GCI callsign, the client is renamed `<callsign> [BOT]`, such as `Image [BOT]`.
+
+Each mission speaker gets its own SRS client, so the SRS client list and the transmitter name show who is talking:
+
+- Each airfield position from an `atc` message, such as `Hatzerim Ground [BOT]` and `Hatzerim Tower [BOT]`.
+- Each package controller from a `packages` message, such as `Blackjack [BOT]`.
+- The speaker named in a `tune` message, such as `Vacuum [BOT]`.
+
+A speaker's client logs in with the same External AWACS Mode password, on the frequencies that speaker talks on. It only transmits: the main client still does all the listening. All calls share one queue, so two speakers never talk over each other.
+
+A `say` message picks its client by its `speaker` field. Without one, SkyEye uses the one speaker the mission said talks on that frequency, else the main client. SkyEye's own GCI calls always use the main client. Past 16 speakers, or when a speaker's client cannot connect, that speaker talks through the main client.
+
 ## Logging
 
 I recommend you retain your logs so that you can include them in any bug reports.

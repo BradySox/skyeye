@@ -31,6 +31,9 @@ type Transmission struct {
 	Frequencies []RadioFrequency
 	// Frequency is the frequency an incoming transmission was heard on, if known.
 	Frequency *RadioFrequency
+	// From, when set on an outgoing transmission, is a voice made with NewVoice that the
+	// transmission goes out under, instead of this client.
+	From *Client
 }
 
 // Client is a SimpleRadio-Standalone Client.
@@ -46,13 +49,22 @@ type Client struct {
 	udpConnection *net.UDPConn
 
 	// clientInfo is the client information for this client. It is what players will see in the SRS client list, and in
-	/// the in-game overlay when this client transmits.
+	/// the in-game overlay when this client transmits. radioLock guards its Name and radios.
 	clientInfo types.ClientInfo
 	// clients is a map of GUIDs to client info, which the bot will use to filter out other clients that are not in the
 	// same coalition and frequency.
 	clients map[types.GUID]types.ClientInfo
-	// clientsLock controls access to the clients map.
+	// clientsLock controls access to the clients and ownVoices maps.
 	clientsLock sync.RWMutex
+	// ownVoices are the GUIDs of this client's voices, made with NewVoice. Their calls are not
+	// heard, and they are not peers.
+	ownVoices map[types.GUID]struct{}
+	// owner is the client a voice speaks for; nil for a client that is not a voice.
+	owner *Client
+	// ready closes once the client has logged in to the SRS server.
+	ready chan struct{}
+	// readyOnce closes ready once.
+	readyOnce sync.Once
 
 	// secureCoalitionRadios indicates if the client should only receive transmissions from the same coalition.
 	// Written by the TCP receiver goroutine (updateServerSettings) and read by the UDP receiver
@@ -74,7 +86,7 @@ type Client struct {
 	// packetNumber is incremented for each voice packet transmitted.
 	packetNumber uint64
 	// txLock prevents multiple outgoing transmissions from occurring simultaneously. It must be acquired before writing
-	// voice packets to the UDP connection.
+	// voice packets to the UDP connection. A voice uses its owner's; take it with transmitLock.
 	txLock sync.Mutex
 	// mute suppresses audio transmission.
 	mute bool
@@ -119,6 +131,7 @@ func NewClient(config types.ClientConfiguration) (*Client, error) {
 		packetNumber: 1,
 		mute:         config.Mute,
 		lastPing:     time.Now(),
+		ready:        make(chan struct{}),
 	}
 
 	err := client.connectTCP()
@@ -152,6 +165,7 @@ func (c *Client) initialize() error {
 	c.radioLock.RUnlock()
 
 	c.SendPing()
+	c.markReady()
 
 	return nil
 }
@@ -207,13 +221,18 @@ func (c *Client) Run(ctx context.Context, wg *sync.WaitGroup) error {
 	wg.Go(func() { c.receivePings(ctx, udpPingRxChan) })
 
 	udpVoiceRxChan := make(chan []byte, maxRxPackets)
-	voiceBytesRxChan := make(chan []voice.Packet, 128)
-	wg.Go(func() { c.receiveVoice(ctx, udpVoiceRxChan, voiceBytesRxChan) })
-	wg.Go(func() { c.decodeVoice(ctx, voiceBytesRxChan) })
+	if c.owner != nil {
+		// A voice hears nothing and sends nothing itself: its owner's queue sends its calls.
+		wg.Go(func() { discardVoice(udpVoiceRxChan, ctx.Done()) })
+	} else {
+		voiceBytesRxChan := make(chan []voice.Packet, 128)
+		wg.Go(func() { c.receiveVoice(ctx, udpVoiceRxChan, voiceBytesRxChan) })
+		wg.Go(func() { c.decodeVoice(ctx, voiceBytesRxChan) })
 
-	voicePacketsTxChan := make(chan []voice.Packet, 3)
-	wg.Go(func() { c.encodeVoice(ctx, voicePacketsTxChan) })
-	wg.Go(func() { c.transmitPackets(ctx, voicePacketsTxChan) })
+		voicePacketsTxChan := make(chan outgoing, 3)
+		wg.Go(func() { c.encodeVoice(ctx, voicePacketsTxChan) })
+		wg.Go(func() { c.transmitPackets(ctx, voicePacketsTxChan) })
+	}
 	wg.Go(func() { c.receiveUDP(ctx, udpPingRxChan, udpVoiceRxChan) })
 	wg.Go(func() { c.autoheal(ctx) })
 

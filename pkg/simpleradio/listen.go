@@ -68,8 +68,9 @@ func (c *Client) AddListenRadios(frequencies []RadioFrequency) error {
 // the re-login never lands while a call is on the air: a call that aired the same minute as one
 // went unheard (2026-10-22).
 func (c *Client) resyncRadios() error {
-	c.txLock.Lock()
-	defer c.txLock.Unlock()
+	lock := c.transmitLock()
+	lock.Lock()
+	defer lock.Unlock()
 	if err := c.sync(); err != nil {
 		return err
 	}

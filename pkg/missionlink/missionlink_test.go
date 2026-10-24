@@ -70,6 +70,20 @@ func TestLinkIgnoresGarbage(t *testing.T) {
 	require.False(t, called)
 }
 
+// A say message names its speaker; one from an older mission script has none.
+func TestLinkSaySpeaker(t *testing.T) {
+	t.Parallel()
+	link, err := Listen("127.0.0.1:0")
+	require.NoError(t, err)
+	var said []Say
+	handlers := Handlers{OnSay: func(s Say) { said = append(said, s) }}
+	link.handle([]byte(`{"type":"say","frequency":"270.450AM","text":"Uzi 2, taxi","speaker":"Hatzerim Ground"}`), nil, handlers)
+	link.handle([]byte(`{"type":"say","frequency":"270.450AM","text":"Uzi 2, taxi"}`), nil, handlers)
+	require.Len(t, said, 2)
+	require.Equal(t, "Hatzerim Ground", said[0].Speaker)
+	require.Empty(t, said[1].Speaker)
+}
+
 func TestLinkTuneAndEmitter(t *testing.T) {
 	t.Parallel()
 	link, err := Listen("127.0.0.1:0")

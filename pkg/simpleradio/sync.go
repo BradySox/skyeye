@@ -22,6 +22,9 @@ func (c *Client) syncClient(other types.ClientInfo) {
 		// why, of course I know him. he's me!
 		return
 	}
+	if c.isOwnVoice(other.GUID) {
+		return
+	}
 
 	if len(other.RadioInfo.Radios) == 0 {
 		return

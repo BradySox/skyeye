@@ -34,8 +34,7 @@ func (c *Client) newMessage(t types.MessageType) types.Message {
 		Version: "2.1.0.2", // stubbing fake SRS version, TODO add flag
 		Type:    t,
 	}
-	client := c.clientInfo
-	client.RadioInfo = c.allRadioInfo()
+	client := c.info()
 	message.Client = &client
 	return message
 }
