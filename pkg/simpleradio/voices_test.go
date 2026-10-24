@@ -12,7 +12,7 @@ import (
 )
 
 // newTestConnection is a connected TCP pair: the client's end and the test server's end.
-func newTestConnection(t *testing.T) (*net.TCPConn, *net.TCPConn) {
+func newTestConnection(t *testing.T) (client, server *net.TCPConn) {
 	t.Helper()
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
@@ -29,15 +29,16 @@ func newTestConnection(t *testing.T) (*net.TCPConn, *net.TCPConn) {
 	conn, err := net.DialTCP("tcp", nil, addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
-	server := <-accepted
+	server = <-accepted
 	t.Cleanup(func() { _ = server.Close() })
-	return conn, server
+	client = conn
+	return client, server
 }
 
 func TestNewVoice(t *testing.T) {
 	t.Parallel()
 	owner := newSyncTestClient()
-	v := owner.newVoice("Hatzerim Ground [BOT]", []RadioFrequency{testPackageFrequency, testPackageFrequency})
+	v := owner.buildVoice("Hatzerim Ground [BOT]", []RadioFrequency{testPackageFrequency, testPackageFrequency})
 	require.Equal(t, "Hatzerim Ground [BOT]", v.Name())
 	require.NotEqual(t, owner.clientInfo.GUID, v.clientInfo.GUID)
 	require.Equal(t, owner.clientInfo.Coalition, v.clientInfo.Coalition)
@@ -53,7 +54,7 @@ func TestNewVoice(t *testing.T) {
 func TestOwnVoiceIsNotAPeer(t *testing.T) {
 	t.Parallel()
 	owner := newSyncTestClient()
-	v := owner.newVoice("Vacuum [BOT]", []RadioFrequency{toFrequency(testRadio)})
+	v := owner.buildVoice("Vacuum [BOT]", []RadioFrequency{toFrequency(testRadio)})
 	peer := testPeer(v.clientInfo.GUID, v.Name(), owner.clientInfo.Coalition, testRadio)
 	owner.syncClient(peer)
 	require.Equal(t, 1, owner.BotsOnFrequency(), "a voice not yet marked is an ordinary peer")
@@ -70,8 +71,8 @@ func TestOwnVoiceIsNotAPeer(t *testing.T) {
 func TestSenderFor(t *testing.T) {
 	t.Parallel()
 	owner := newSyncTestClient()
-	v := owner.newVoice("Blackjack [BOT]", []RadioFrequency{testPackageFrequency})
-	stranger := newSyncTestClient().newVoice("Stranger [BOT]", nil)
+	v := owner.buildVoice("Blackjack [BOT]", []RadioFrequency{testPackageFrequency})
+	stranger := newSyncTestClient().buildVoice("Stranger [BOT]", nil)
 	stranger.markReady()
 
 	require.Same(t, owner, owner.senderFor(Transmission{}), "no voice named")
@@ -86,7 +87,7 @@ func TestSenderFor(t *testing.T) {
 
 func TestWaitReadyTimesOut(t *testing.T) {
 	t.Parallel()
-	v := newSyncTestClient().newVoice("Hatzerim Tower [BOT]", nil)
+	v := newSyncTestClient().buildVoice("Hatzerim Tower [BOT]", nil)
 	require.False(t, v.WaitReady(10*time.Millisecond))
 }
 
@@ -120,7 +121,7 @@ func TestVoiceResyncWaitsForOwnerTransmission(t *testing.T) {
 	t.Parallel()
 	conn, server := newTestConnection(t)
 	owner := newSyncTestClient()
-	v := owner.newVoice("Vacuum [BOT]", []RadioFrequency{toFrequency(testRadio)})
+	v := owner.buildVoice("Vacuum [BOT]", []RadioFrequency{toFrequency(testRadio)})
 	v.tcpConnection = conn
 
 	owner.txLock.Lock()

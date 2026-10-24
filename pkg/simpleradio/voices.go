@@ -19,7 +19,7 @@ import (
 // NewVoice connects a voice for c named name, on the given frequencies. Run it like c. A
 // Transmission with From set to it goes out under its name.
 func (c *Client) NewVoice(name string, frequencies []RadioFrequency) (*Client, error) {
-	v := c.newVoice(name, frequencies)
+	v := c.buildVoice(name, frequencies)
 	if err := v.connectTCP(); err != nil {
 		return nil, fmt.Errorf("failed to connect voice %q to SRS server: %w", name, err)
 	}
@@ -31,8 +31,8 @@ func (c *Client) NewVoice(name string, frequencies []RadioFrequency) (*Client, e
 	return v, nil
 }
 
-// newVoice builds a voice for c without touching the network.
-func (c *Client) newVoice(name string, frequencies []RadioFrequency) *Client {
+// buildVoice builds a voice for c without touching the network.
+func (c *Client) buildVoice(name string, frequencies []RadioFrequency) *Client {
 	owner := c.info()
 	radios := make([]types.Radio, 0, len(frequencies))
 	receivers := make(map[types.Radio]*receiver, len(frequencies))
