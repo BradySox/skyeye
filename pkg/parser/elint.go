@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dharmab/numwords"
 	"github.com/dharmab/skyeye/pkg/brevity"
@@ -89,11 +90,60 @@ var mudHomophones = map[string]bool{"mod": true, "much": true, "mudd": true, "mu
 // bearingLeadIns are words between MUD and its bearing: "mud spike at 270", "mud bearing 270".
 var bearingLeadIns = map[string]bool{"at": true, "spike": true, "bearing": true, "is": true, "on": true, "of": true, "uh": true, "um": true}
 
+// radarNames are radar and SAM names a pilot may say beside a mud bearing: "mud Hawk 185".
+var radarNames = map[string]bool{
+	"sam": true, "radar": true, "hawk": true, "patriot": true, "roland": true, "rapier": true,
+	"nasams": true, "kub": true, "buk": true, "osa": true, "tor": true, "strela": true,
+	"tunguska": true, "pantsir": true, "gainful": true, "gecko": true, "gadfly": true,
+	"grumble": true, "goa": true, "guideline": true, "gladiator": true, "giant": true,
+	"gauntlet": true, "grison": true, "greyhound": true, "gopher": true, "grizzly": true,
+}
+
+// maxDesignatorDigits is the most digits an SA or HQ number takes: SA-6, SA-23.
+const maxDesignatorDigits = 2
+
+// radarWords is how many fields at i name a radar: "sa 6", "s a 6", "hq 7" or "hawk", else 0.
+// Whisper splits "SA-6-185" into "sa 6 185", so the number after SA is the system, not the bearing.
+func radarWords(fields []string, i int) int {
+	if radarNames[fields[i]] {
+		return 1
+	}
+	n := 0
+	switch {
+	case fields[i] == "sa" || fields[i] == "hq":
+		n = 1
+	case fields[i] == "s" && i+1 < len(fields) && fields[i+1] == "a":
+		n = 2
+	default:
+		return 0
+	}
+	if i+n < len(fields) && len(fields[i+n]) <= maxDesignatorDigits {
+		if _, err := strconv.Atoi(fields[i+n]); err == nil {
+			n++
+		}
+	}
+	return n
+}
+
 // parseMudBearing reads a bearing of one to three digits, spoken digit by digit or as one number.
+// A radar named before it is skipped: "mud SA-6 185", "mud Hawk 185".
 func parseMudBearing(fields []string) (string, bool) {
+	bearing, _, ok := mudBearingAt(fields)
+	return bearing, ok
+}
+
+// mudBearingAt is parseMudBearing, with the index of the first field after the bearing.
+func mudBearingAt(fields []string) (bearing string, end int, ok bool) {
 	i := 0
-	for i < len(fields) && bearingLeadIns[fields[i]] {
-		i++
+	for i < len(fields) {
+		skip := radarWords(fields, i)
+		if bearingLeadIns[fields[i]] {
+			skip = 1
+		}
+		if skip == 0 {
+			break
+		}
+		i += skip
 	}
 	var digits strings.Builder
 	for ; i < len(fields) && digits.Len() < 3; i++ {
@@ -107,13 +157,66 @@ func parseMudBearing(fields []string) (string, bool) {
 		digits.WriteString(f)
 	}
 	if digits.Len() == 0 || digits.Len() > 3 {
-		return "", false
+		return "", i, false
 	}
 	n, err := strconv.Atoi(digits.String())
 	if err != nil || n > 360 {
-		return "", false
+		return "", i, false
 	}
-	return fmt.Sprintf("%03d", n%360), true
+	return fmt.Sprintf("%03d", n%360), i, true
+}
+
+// MudFollowUpWindow is how long after a mud call with no bearing ("say mud bearing") the same
+// caller's bare bearing, such as "1 8 0", still answers it.
+const MudFollowUpWindow = 30 * time.Second
+
+type pendingMud struct {
+	request brevity.ELINTRequest
+	at      time.Time
+}
+
+// AwaitMudBearing remembers a mud call heard with no bearing, so caller's next bare bearing is
+// taken as that call. caller names the radio and frequency it was heard from.
+func (p *Parser) AwaitMudBearing(caller string, request *brevity.ELINTRequest, now time.Time) {
+	if caller == "" || request == nil || request.Kind != brevity.ELINTMud || request.Bearing != "" {
+		return
+	}
+	p.mudLock.Lock()
+	defer p.mudLock.Unlock()
+	if p.pendingMuds == nil {
+		p.pendingMuds = make(map[string]pendingMud)
+	}
+	p.pendingMuds[caller] = pendingMud{request: *request, at: now}
+}
+
+// ParseMudFollowUp reads a bare bearing ("1 8 0", "one eight zero", "mud 180") from a caller
+// whose mud call had none, within MudFollowUpWindow. Returns nil otherwise.
+func (p *Parser) ParseMudFollowUp(tx string, caller string, now time.Time) *brevity.ELINTRequest {
+	if caller == "" || len(tx) > maxInputLength {
+		return nil
+	}
+	p.mudLock.Lock()
+	defer p.mudLock.Unlock()
+	pending, ok := p.pendingMuds[caller]
+	if !ok {
+		return nil
+	}
+	if now.Sub(pending.at) > MudFollowUpWindow {
+		delete(p.pendingMuds, caller)
+		return nil
+	}
+	fields := strings.Fields(p.normalizeText(tx))
+	if len(fields) > 0 && (fields[0] == "mud" || mudHomophones[fields[0]]) {
+		fields = fields[1:]
+	}
+	bearing, end, ok := mudBearingAt(fields)
+	if !ok || end != len(fields) {
+		return nil
+	}
+	delete(p.pendingMuds, caller)
+	request := pending.request
+	request.Bearing = bearing
+	return &request
 }
 
 func isEmitterWord(w string) bool {

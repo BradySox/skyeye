@@ -41,6 +41,9 @@ type Parser struct {
 	// calls are parsed by ParseELINT, never as GCI or package calls. Guarded by
 	// packageControllersLock.
 	speakers []string
+	// pendingMuds are mud calls Vacuum asked the bearing of, by caller. Guarded by mudLock.
+	pendingMuds map[string]pendingMud
+	mudLock     sync.Mutex
 }
 
 // SetPackageControllers replaces the package controller callsigns the parser listens for.
