@@ -28,6 +28,9 @@ func TestPromptMissionVocabulary(t *testing.T) {
 	assert.Contains(t, p, "Airfields: Hatzerim, Nevatim.")
 	assert.Contains(t, p, "Locations: Tel Aviv.")
 	assert.Contains(t, p, "ready for takeoff")
+	for _, word := range []string{"flight of two", "have the numbers", "initial", "break", "straight-in", "base", "gear down", "3-mile final"} {
+		assert.Contains(t, p, word)
+	}
 	// ATC gives no squawk codes, so the prompt does not steer toward one.
 	assert.NotContains(t, strings.ToLower(p), "squawk")
 	assert.Contains(t, p, "Check in")

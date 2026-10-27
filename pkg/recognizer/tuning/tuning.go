@@ -17,7 +17,8 @@ const MaxPromptChars = 600
 const DefaultThreads = 8
 
 // atcWords are the words of a Ground or Tower call. No squawk: RetLab's ATC gives no codes.
-const atcWords = "Ground, Tower, request taxi, holding short, ready for takeoff, runway, inbound, outbound, full stop."
+const atcWords = "Ground, Tower, request taxi, flight of two, have the numbers, holding short, ready for takeoff, " +
+	"runway, inbound, initial, break, straight-in, base, gear down, 3-mile final, full stop."
 
 // packageWords are the words of a package call.
 const packageWords = "Check in, checking in, package, on station."

@@ -36,10 +36,12 @@ var atcCallsignHomophones = map[string]string{
 	"free": "3", "tree": "3", "ate": "8",
 }
 
-// notCallsignWords open a request, never a callsign: "ready for takeoff" is not "Ready 4".
+// notCallsignWords open a request, never a callsign: "ready for takeoff" is not "Ready 4", and
+// "flight of two" is not "Of 2".
 var notCallsignWords = map[string]bool{
 	"request": true, "requesting": true, "ready": true, "holding": true, "taxi": true,
 	"inbound": true, "clear": true, "airborne": true, "say": true, "radio": true,
+	"initial": true, "base": true, "gear": true, "flight": true, "of": true,
 }
 
 // distanceWords follow a distance, which is never part of a callsign.
@@ -277,10 +279,99 @@ func hasPhrase(tokens []string, phrase string) bool {
 	return strings.Contains(" "+strings.Join(tokens, " ")+" ", " "+phrase+" ")
 }
 
+// ATC request details, for the mission to tell the calls of one kind apart.
+const (
+	// DetailOverhead asks for the overhead break.
+	DetailOverhead = "overhead"
+	// DetailStraightIn asks for a straight-in approach.
+	DetailStraightIn = "straightin"
+	// DetailInitial reports the initial point of the overhead.
+	DetailInitial = "initial"
+	// DetailBreak reports the break.
+	DetailBreak = "break"
+	// DetailGearDown reports base or final with the gear down: the call for a landing clearance.
+	DetailGearDown = "geardown"
+	// DetailNumbers is a taxi or takeoff call that says "have the numbers": no altimeter or wind.
+	DetailNumbers = "numbers"
+)
+
+// emergencyPhrases are an emergency without "mayday": "engine failure" is not a start request.
+var emergencyPhrases = []string{
+	"engine failure", "engine failed", "engine out", "engines out", "engine fire", "flame out", "lost an engine", "lost engine",
+}
+
+func isEmergency(tokens []string) bool {
+	if hasToken(tokens, "mayday", "emergency", "flameout", "fire") || hasPhrase(tokens, "pan pan") { //nolint:dupword // the call is "pan pan"
+		return true
+	}
+	for _, phrase := range emergencyPhrases {
+		if hasPhrase(tokens, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasTheNumbers is "have the numbers": the pilot has the runway, wind and altimeter already.
+func hasTheNumbers(tokens []string) bool {
+	return hasToken(tokens, "numbers")
+}
+
+// isGearDown is a landing call: "base, gear down", "3 mile final", "gear's down". "Returning to
+// base" is not one.
+func isGearDown(tokens []string) bool {
+	if hasPhrase(tokens, "gear down") || hasPhrase(tokens, "gears down") || hasPhrase(tokens, "gear s down") ||
+		hasPhrase(tokens, "gear is down") || hasToken(tokens, "final") {
+		return true
+	}
+	for i, t := range tokens {
+		if t == "base" && (i == 0 || tokens[i-1] != "to") {
+			return true
+		}
+	}
+	return false
+}
+
+// isBreak is the break report. Whisper writes "brake" for it; "hot brakes" is not one.
+func isBreak(tokens []string) bool {
+	if hasToken(tokens, "break") {
+		return true
+	}
+	return hasToken(tokens, "brake") && !hasToken(tokens, "hot")
+}
+
+func isStraightIn(tokens []string) bool {
+	return hasToken(tokens, "straightin") || hasPhrase(tokens, "straight in")
+}
+
+// arrivalDetail tells the arrival calls apart, nearest the runway first.
+func arrivalDetail(tokens []string) (string, bool) {
+	requesting := hasToken(tokens, "request", "requesting")
+	switch {
+	case isGearDown(tokens):
+		return DetailGearDown, true
+	case isBreak(tokens) && !requesting:
+		return DetailBreak, true
+	case hasToken(tokens, "initial"):
+		return DetailInitial, true
+	case isStraightIn(tokens):
+		return DetailStraightIn, true
+	case hasToken(tokens, "overhead") || isBreak(tokens):
+		return DetailOverhead, true
+	case hasToken(tokens, "inbound", "mile", "miles", "landing", "full") || hasPhrase(tokens, "visual approach"):
+		return "", true
+	}
+	return "", false
+}
+
 // atcKind reads the request in the words after the callsign.
 func atcKind(tokens []string) (brevity.ATCRequestKind, string) {
+	numbers := ""
+	if hasTheNumbers(tokens) {
+		numbers = DetailNumbers
+	}
 	switch {
-	case hasToken(tokens, "mayday", "emergency") || hasPhrase(tokens, "pan pan"): //nolint:dupword // the call is "pan pan"
+	case isEmergency(tokens):
 		return brevity.ATCEmergency, ""
 	case isRadioCheck(tokens):
 		return brevity.ATCRadioCheck, ""
@@ -291,18 +382,27 @@ func atcKind(tokens []string) (brevity.ATCRequestKind, string) {
 	case hasToken(tokens, "start", "startup", "engine", "engines"):
 		return brevity.ATCStartup, ""
 	case hasToken(tokens, "taxi", "taxis"):
-		return brevity.ATCTaxi, ""
-	case hasToken(tokens, "holding", "ready", "takeoff", "departure") || hasPhrase(tokens, "take off"):
-		return brevity.ATCReady, ""
+		return brevity.ATCTaxi, numbers
 	case isAirborne(tokens):
+		// Before the takeoff words: "airborne, switching departure" is not a takeoff request.
 		return brevity.ATCAirborne, ""
-	case hasToken(tokens, "overhead", "break"):
-		return brevity.ATCInbound, "overhead"
-	case hasToken(tokens, "inbound", "mile", "miles", "initial", "landing", "full", "final") ||
-		hasPhrase(tokens, "straight in") || hasPhrase(tokens, "visual approach"):
-		return brevity.ATCInbound, ""
+	case hasToken(tokens, "holding", "ready", "takeoff", "departure") || hasPhrase(tokens, "take off"):
+		return brevity.ATCReady, numbers
+	}
+	if detail, ok := arrivalDetail(tokens); ok {
+		return brevity.ATCInbound, detail
 	}
 	return brevity.ATCUnknown, ""
+}
+
+// isPatternReport is a call in the pattern, which a pilot makes without the station: "Viper 1-1,
+// initial", "Viper 1-1, base, gear down".
+func isPatternReport(tokens []string) bool {
+	if hasToken(tokens, "cleared") {
+		return false
+	}
+	kind, detail := atcKind(tokens)
+	return kind == brevity.ATCInbound && (detail == DetailInitial || detail == DetailBreak || detail == DetailGearDown)
 }
 
 // radioCheckPhrases are the ways a pilot asks how he is heard.
@@ -428,11 +528,17 @@ func ParseATC(tx string, loose bool) *brevity.ATCRequest {
 	} else if head, end, found := callsignSpan(tokens, 0); found && isReadback(tokens[end:]) {
 		// The callsign first: "Viper 1-1, cleared for takeoff 25".
 		callsign, items = head, tokens[end:]
+	} else if found && isPatternReport(tokens[end:]) {
+		return patternReport(head, tokens[end:], text)
 	} else {
 		if loose {
 			return looseRequest(tokens, text)
 		}
 		return nil
+	}
+	if isPatternReport(items) && !isReadback(items) {
+		// The callsign last: "Base, gear down, Viper 1-1".
+		return patternReport(callsign, items, text)
 	}
 	kind := brevity.ATCReadback
 	if k, _ := atcKind(items); k == brevity.ATCRadioCheck || k == brevity.ATCSayAgain {
@@ -441,6 +547,18 @@ func ParseATC(tx string, loose bool) *brevity.ATCRequest {
 	return &brevity.ATCRequest{
 		Callsign: callsign,
 		Kind:     kind,
+		Numbers:  atcNumbers(items),
+		Text:     text,
+	}
+}
+
+// patternReport is a pattern call with no station.
+func patternReport(callsign string, items []string, text string) *brevity.ATCRequest {
+	_, detail := atcKind(items)
+	return &brevity.ATCRequest{
+		Callsign: callsign,
+		Kind:     brevity.ATCInbound,
+		Detail:   detail,
 		Numbers:  atcNumbers(items),
 		Text:     text,
 	}
