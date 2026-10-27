@@ -117,3 +117,107 @@ func TestATCTokensBreakNumbersWrittenApart(t *testing.T) {
 	require.Equal(t, []string{"viper", "1", "1"}, atcTokens("Viper 1-1"))
 	require.Equal(t, []string{"3", "0", "0", "0", "golf"}, atcTokens("3,000, Golf"))
 }
+
+type atcDetailCase struct {
+	text     string
+	callsign string
+	kind     brevity.ATCRequestKind
+	detail   string
+}
+
+// The military pattern calls (2026-10-26): taxi with the numbers or a flight count, the overhead
+// and straight-in, and the landing call at base or final with the gear down.
+func TestParseATCPatternCalls(t *testing.T) {
+	t.Parallel()
+	for _, test := range []atcDetailCase{
+		// Taxi and takeoff: a flight count is never a ship number.
+		{"Hatzerim Ground, Viper 1-1, flight of two, request taxi.", "viper 1 1", brevity.ATCTaxi, ""},
+		{"Hatzerim Ground, Viper 1, flight of four, request taxi.", "viper 1", brevity.ATCTaxi, ""},
+		{"Hatzerim Ground, Viper 1-1, flight of two, have the numbers, request taxi.", "viper 1 1", brevity.ATCTaxi, DetailNumbers},
+		{"Ground, Viper 1-1, request taxi with the numbers.", "viper 1 1", brevity.ATCTaxi, DetailNumbers},
+		{"Tower, Viper 1-1 flight, holding short, ready for takeoff.", "viper 1 1", brevity.ATCReady, ""},
+		{"Tower, Viper 1-1, have the numbers, ready for departure.", "viper 1 1", brevity.ATCReady, DetailNumbers},
+		// Airborne is never a takeoff request.
+		{"Tower, Viper 1-1, airborne, switching departure.", "viper 1 1", brevity.ATCAirborne, ""},
+		{"Hatzerim Tower, Viper 1-1, airborne, changing to departure.", "viper 1 1", brevity.ATCAirborne, ""},
+		{"Tower, Viper 1-1, ready for departure.", "viper 1 1", brevity.ATCReady, ""},
+		// Inbound: overhead by default, straight-in on request.
+		{"Hatzerim Tower, Viper 1-1, 10 miles, inbound, full stop.", "viper 1 1", brevity.ATCInbound, ""},
+		{"Hatzerim Tower, Viper 1-1, 10 miles, request the overhead.", "viper 1 1", brevity.ATCInbound, DetailOverhead},
+		{"Tower, Viper 1-1, 10 miles, request the break.", "viper 1 1", brevity.ATCInbound, DetailOverhead},
+		{"Hatzerim Tower, Viper 1-1, 10 miles, request straight-in, full stop.", "viper 1 1", brevity.ATCInbound, DetailStraightIn},
+		{"Tower, Viper 1-1, 15 miles, straight in.", "viper 1 1", brevity.ATCInbound, DetailStraightIn},
+		{"Hatzerim Tower, Viper 1-1, 20 miles, returning to base, full stop.", "viper 1 1", brevity.ATCInbound, ""},
+		// Pattern reports, with or without the station.
+		{"Tower, Viper 1-1, initial.", "viper 1 1", brevity.ATCInbound, DetailInitial},
+		{"Viper 1-1, initial.", "viper 1 1", brevity.ATCInbound, DetailInitial},
+		{"Viper 1-1, initial, full stop.", "viper 1 1", brevity.ATCInbound, DetailInitial},
+		{"Viper 1-1, break.", "viper 1 1", brevity.ATCInbound, DetailBreak},
+		{"Viper 1-1, brake.", "viper 1 1", brevity.ATCInbound, DetailBreak},
+		{"Viper 1-1, base, gear down, full stop.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		{"Viper 1-2, base, gear's down.", "viper 1 2", brevity.ATCInbound, DetailGearDown},
+		{"Viper 1-1, 3 miles, gear down.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		{"Viper 1-1, 3 mile final, gear down.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		{"Viper 1-1, on final, gear down.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		{"Viper 1-1, gear down.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		{"Viper 1-1 flight, base, gear down.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		{"Base, gear down, Viper 1-1.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		{"Tower, Viper 1-1, 3 mile final, gear down.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		{"Viper 1-1, 3 mile final.", "viper 1 1", brevity.ATCInbound, DetailGearDown},
+		// Emergencies without "mayday".
+		{"Tower, Viper 1-1, engine failure.", "viper 1 1", brevity.ATCEmergency, ""},
+		{"Tower, Viper 1-1, engine out, 10 miles.", "viper 1 1", brevity.ATCEmergency, ""},
+		{"Tower, Viper 1-1, flameout.", "viper 1 1", brevity.ATCEmergency, ""},
+		{"Tower, Viper 1-1, flame out.", "viper 1 1", brevity.ATCEmergency, ""},
+		{"Tower, Viper 1-1, engine fire.", "viper 1 1", brevity.ATCEmergency, ""},
+		{"Ground, Viper 1-1, request engine start.", "viper 1 1", brevity.ATCStartup, ""},
+		// The runway in use (Test 65).
+		{"Hatzerim Tower, Enfield 4-1, request runway in use.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
+		{"Hatzerim Ground, Enfield 4-1, request active runway.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
+		{"Tower, Enfield 4-1, say active.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
+		// Hot brakes is not the break.
+		{"Tower, Viper 1-1, hot brakes.", "viper 1 1", brevity.ATCUnknown, ""},
+	} {
+		t.Run(test.text, func(t *testing.T) {
+			t.Parallel()
+			actual := ParseATC(test.text, false)
+			require.NotNil(t, actual)
+			require.Equal(t, test.callsign, actual.Callsign)
+			require.Equal(t, test.kind, actual.Kind)
+			require.Equal(t, test.detail, actual.Detail)
+		})
+	}
+}
+
+// A pattern report without the station is a request, never a readback; a readback stays one.
+func TestParseATCPatternReportsAreNotReadbacks(t *testing.T) {
+	t.Parallel()
+	require.Nil(t, ParseATC("Viper 1-1, flight of two.", false))
+	actual := ParseATC("Viper 1-1, cleared to land runway 25.", false)
+	require.NotNil(t, actual)
+	require.Equal(t, brevity.ATCReadback, actual.Kind)
+	actual = ParseATC("Runway 25, cleared to land, Viper 1-1.", false)
+	require.NotNil(t, actual)
+	require.Equal(t, brevity.ATCReadback, actual.Kind)
+	actual = ParseATC("Viper 1-1, flight of two, 3 miles, gear down.", false)
+	require.NotNil(t, actual)
+	require.Equal(t, "viper 1 1", actual.Callsign)
+	require.Equal(t, []string{"2", "3"}, actual.Numbers)
+}
+
+// "Clear" for "cleared" in a readback, in either order (Test 65); "clear of the runway" stays a
+// request.
+func TestParseATCClearReadbacks(t *testing.T) {
+	t.Parallel()
+	checkATCPhrasing(t, false, []atcPhrasingCase{
+		{"Enfield 4, clear for takeoff 2-3.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+		{"Enfield 4-1, clear to land runway 23.", "enfield 4 1", brevity.ATCReadback, []string{"23"}},
+		{"Enfield 4, runway 23, takeoff clear.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+		{"Clear for takeoff 23, Enfield 4.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+		{"Tower, Enfield 4, clear for takeoff 23.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+		{"Tower, Enfield 4, clear of the runway.", "enfield 4", brevity.ATCClear, nil},
+	})
+	checkATCPhrasing(t, true, []atcPhrasingCase{
+		{"Enfield 4, clear for takeoff 2-3.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+	})
+}
