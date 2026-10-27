@@ -75,26 +75,12 @@ func voiceFrom(ctx context.Context) (string, bool) {
 
 // isImportantCall is true for calls a pilot on the strike frequency must hear. Everything else
 // SkyEye broadcasts stays off strike, so the GCI does not step on the package traffic.
-func (a *Application) isImportantCall(call any) bool {
-	a.speakersLock.Lock()
-	threatsOnly := a.strikeThreatsOnly
-	a.speakersLock.Unlock()
+func (*Application) isImportantCall(call any) bool {
 	switch call.(type) {
-	case brevity.ThreatCall:
+	case brevity.ThreatCall, brevity.MergedCall:
 		return true
-	case brevity.MergedCall:
-		return !threatsOnly
 	}
 	return false
-}
-
-// answersOnStrike is false when the mission keeps the GCI on strike to threat calls.
-func (a *Application) answersOnStrike(heard *simpleradio.RadioFrequency) bool {
-	a.speakersLock.Lock()
-	threatsOnly := a.strikeThreatsOnly
-	a.speakersLock.Unlock()
-	strike, ok := a.strikeFrequency()
-	return !threatsOnly || !ok || heard == nil || !heard.IsSameFrequency(strike)
 }
 
 // Voice names: "feminine" and "masculine" are the built-in voices; anything else is a Piper voice
@@ -170,22 +156,17 @@ func (a *Application) strikeFrequency() (simpleradio.RadioFrequency, bool) {
 	return *a.strike, true
 }
 
-// heardOnLooseStrike is true for a transmission heard on strike when the mission allows loose calls.
-func (a *Application) heardOnLooseStrike(ctx context.Context) bool {
-	a.speakersLock.Lock()
-	loose := a.looseCalls
-	a.speakersLock.Unlock()
+// heardOnStrike is true for a transmission heard on the mission's strike frequency, where a
+// package call that names only the pilot goes to the package controller. Every mission gets
+// these loose calls; an older mission's looseCalls field is ignored.
+func (a *Application) heardOnStrike(ctx context.Context) bool {
 	heard, ok := heardFrequencyFrom(ctx)
 	strike, isSet := a.strikeFrequency()
-	return loose && ok && isSet && heard.IsSameFrequency(strike)
+	return ok && isSet && heard.IsSameFrequency(strike)
 }
 
 func (a *Application) applyPackages(packages missionlink.Packages) {
 	a.parser.SetPackageControllers(packages.Controllers)
-	a.speakersLock.Lock()
-	a.looseCalls = packages.LooseCalls
-	a.strikeThreatsOnly = packages.StrikeThreatsOnly
-	a.speakersLock.Unlock()
 	frequencies := make([]simpleradio.RadioFrequency, 0, len(packages.Packages)+1)
 	var strike *simpleradio.RadioFrequency
 	if packages.Strike != "" {
@@ -274,7 +255,6 @@ func (a *Application) applyATC(atc missionlink.ATC) {
 	}
 	a.speakersLock.Lock()
 	a.atcFrequencies = frequencies
-	a.atcLoose = atc.Discipline == "casual"
 	a.speakersLock.Unlock()
 	if err := a.srsClient.AddListenRadios(frequencies); err != nil {
 		log.Error().Err(err).Msg("failed to tune ATC frequencies")
@@ -290,17 +270,16 @@ func (a *Application) applyATC(atc missionlink.ATC) {
 	})
 }
 
-// isATCFrequency is true if the frequency is one of the mission's airfield frequencies. loose is
-// true when the mission parses ATC calls loosely.
-func (a *Application) isATCFrequency(frequency simpleradio.RadioFrequency) (atc bool, loose bool) {
+// isATCFrequency is true if the frequency is one of the mission's airfield frequencies.
+func (a *Application) isATCFrequency(frequency simpleradio.RadioFrequency) bool {
 	a.speakersLock.Lock()
 	defer a.speakersLock.Unlock()
 	for _, f := range a.atcFrequencies {
 		if f.IsSameFrequency(frequency) {
-			return true, a.atcLoose
+			return true
 		}
 	}
-	return false, false
+	return false
 }
 
 // applyTune joins a mission speaker's frequencies. A tune that names a speaker, such as Vacuum,

@@ -41,13 +41,15 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 	}
 	logger.Info().Msg("parsing text")
 	var request any
-	atc, loose := false, false
+	atc := false
 	if frequency, ok := heardFrequencyFrom(ctx); ok {
-		atc, loose = a.isATCFrequency(frequency)
+		atc = a.isATCFrequency(frequency)
 	}
 	if atc {
-		// An airfield frequency carries ATC calls only: the GCI never answers there.
-		if call := parser.ParseATC(text, loose); call != nil {
+		// An airfield frequency carries ATC calls only: the GCI never answers there. Every call is
+		// parsed loosely, with or without the station or the callsign; an older mission's
+		// discipline field is ignored.
+		if call := parser.ParseATC(text, true); call != nil {
 			request = call
 		}
 	} else if call := a.parser.ParseMudFollowUp(text, mudCaller(ctx), time.Now()); call != nil {
@@ -59,7 +61,7 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 		request = call
 	} else {
 		request = a.parser.Parse(text)
-		if request == nil && a.heardOnLooseStrike(ctx) {
+		if request == nil && a.heardOnStrike(ctx) {
 			if looseCall := a.parser.ParseLoosePackageCall(text); looseCall != nil {
 				request = looseCall
 			}

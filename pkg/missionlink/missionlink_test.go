@@ -209,3 +209,15 @@ func TestPackagesCarryPilots(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(`{"type":"packages","controllers":[],"packages":[],"pilots":[{"name":"Flash","callsign":"Ford 9-1"}]}`), &packages))
 	require.Equal(t, []Pilot{{Name: "Flash", Callsign: "Ford 9-1"}}, packages.Pilots)
 }
+
+// A mission built before every call was parsed loosely still sends looseCalls, strikeThreatsOnly
+// and the ATC discipline; SkyEye reads the rest of the message and ignores them.
+func TestOlderMissionFieldsAreIgnored(t *testing.T) {
+	t.Parallel()
+	var packages Packages
+	require.NoError(t, json.Unmarshal([]byte(`{"type":"packages","controllers":["Mantis"],"packages":[],"looseCalls":false,"strikeThreatsOnly":true}`), &packages))
+	require.Equal(t, []string{"Mantis"}, packages.Controllers)
+	var atc ATC
+	require.NoError(t, json.Unmarshal([]byte(`{"type":"atc","fields":[],"discipline":"strict","callsigns":["Uzi 2"]}`), &atc))
+	require.Equal(t, []string{"Uzi 2"}, atc.Callsigns)
+}

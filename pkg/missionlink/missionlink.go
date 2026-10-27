@@ -61,12 +61,6 @@ type Packages struct {
 	GCIVoice string `json:"gciVoice,omitempty"`
 	// GCICallsign is SkyEye's own callsign for this mission, such as "Chainsaw".
 	GCICallsign string `json:"gciCallsign,omitempty"`
-	// LooseCalls lets a package call on the strike frequency name only the pilot, for squadrons
-	// that do not fly by the book.
-	LooseCalls bool `json:"looseCalls,omitempty"`
-	// StrikeThreatsOnly keeps the GCI on strike to threat calls: no merges, and answers to calls
-	// heard on strike go out on the GCI's own frequencies.
-	StrikeThreatsOnly bool `json:"strikeThreatsOnly,omitempty"`
 	// Pilots are the players in the mission's flights, so the GCI finds a player by the flight
 	// callsign they say when their in-game name is something else.
 	Pilots []Pilot `json:"pilots,omitempty"`
@@ -148,9 +142,6 @@ type ATCField struct {
 type ATC struct {
 	Type   string     `json:"type"`
 	Fields []ATCField `json:"fields"`
-	// Discipline is the mission's radio discipline: "strict", "relaxed" or "casual". Casual
-	// parses calls loosely.
-	Discipline string `json:"discipline,omitempty"`
 	// Callsigns are the flights the mission runs ATC for, such as "Uzi 2". SkyEye only uses them
 	// to steer speech recognition toward them.
 	Callsigns []string `json:"callsigns,omitempty"`

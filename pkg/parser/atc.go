@@ -498,9 +498,9 @@ func withoutSpan(tokens []string, from, to int) []string {
 // Ground", or just "Tower"), then the callsign and the request; a mayday opens with "mayday"; a
 // readback is the clearance's items, then the callsign. Returns nil for chatter with no callsign.
 //
-// Loose parsing is for the mission's Casual radio discipline: a call may leave out the station
-// ("Viper 1-1, request taxi") or the callsign ("Tower, ready for takeoff"), and the mission
-// works out who called from the frequency.
+// Loose parsing, which SkyEye uses for every mission, lets a call leave out the station ("Viper
+// 1-1, request taxi") or the callsign ("Tower, ready for takeoff"), and the mission works out who
+// called from the frequency.
 func ParseATC(tx string, loose bool) *brevity.ATCRequest {
 	if len(tx) > maxInputLength {
 		tx = tx[:maxInputLength]
