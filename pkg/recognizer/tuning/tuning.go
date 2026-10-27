@@ -23,6 +23,9 @@ const atcWords = "Ground, Tower, request taxi, flight of two, have the numbers, 
 // packageWords are the words of a package call.
 const packageWords = "Check in, checking in, package, on station."
 
+// offTargetWords are the words of a flight's off-target call to its package controller.
+const offTargetWords = "Off target, egressing."
+
 // Vocabulary is what the mission tells SkyEye that pilots will say.
 type Vocabulary struct {
 	// Callsign is SkyEye's own GCI callsign for the mission. Empty keeps the configured one.
@@ -49,7 +52,7 @@ func Prompt(callsign string, locations []string, vocab Vocabulary) string {
 
 	var tail []string
 	if len(vocab.Callsigns) > 0 {
-		tail = append(tail, packageWords)
+		tail = append(tail, packageWords, offTargetWords)
 	}
 	if len(vocab.Fields) > 0 {
 		tail = append(tail, atcWords)
