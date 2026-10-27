@@ -75,7 +75,7 @@ func voiceFrom(ctx context.Context) (string, bool) {
 
 // isImportantCall is true for calls a pilot on the strike frequency must hear. Everything else
 // SkyEye broadcasts stays off strike, so the GCI does not step on the package traffic.
-func (a *Application) isImportantCall(call any) bool {
+func (*Application) isImportantCall(call any) bool {
 	switch call.(type) {
 	case brevity.ThreatCall, brevity.MergedCall:
 		return true
