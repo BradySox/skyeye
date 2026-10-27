@@ -3,7 +3,6 @@ package controller
 import (
 	"slices"
 
-	"github.com/dharmab/skyeye/pkg/callsigns"
 	"github.com/dharmab/skyeye/pkg/trackfiles"
 	"github.com/rs/zerolog/log"
 )
@@ -19,7 +18,7 @@ func (c *Controller) addFriendlyToBroadcast(friendlyCallsigns []string, friendly
 	if !shouldBroadcast {
 		return friendlyCallsigns
 	}
-	if callsign, ok := callsigns.ParsePilotCallsign(friendly.Contact.Name); ok {
+	if callsign, ok := c.friendlyCallsign(friendly); ok {
 		if !slices.Contains(friendlyCallsigns, callsign) {
 			friendlyCallsigns = append(friendlyCallsigns, callsign)
 		}

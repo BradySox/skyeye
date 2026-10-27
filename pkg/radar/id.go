@@ -24,6 +24,13 @@ func (r *Radar) SetCallsignAliases(aliases map[string]string) {
 	r.contacts.setAliases(aliases)
 }
 
+// SpokenCallsign returns the flight callsign the GCI calls the trackfile named name by, such as
+// "ford 9 1" for the player "Flash", when the mission says which seat that player flies. The
+// second return value is false if it did not.
+func (r *Radar) SpokenCallsign(name string) (string, bool) {
+	return r.contacts.spokenCallsign(name)
+}
+
 // FindUnit returns the trackfile for the given unit ID, or nil if no trackfile was found.
 func (r *Radar) FindUnit(id uint64) *trackfiles.Trackfile {
 	trackfile, ok := r.contacts.getByID(id)

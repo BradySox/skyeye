@@ -3,6 +3,7 @@ package radar
 import (
 	"iter"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/dharmab/skyeye/pkg/callsigns"
@@ -24,6 +25,9 @@ type contactDatabase struct {
 	// aliases maps a flight callsign a pilot says, such as "ford 9 1", to the name of the
 	// trackfile flying it, such as the player name "Flash". Set by the mission.
 	aliases map[string]string
+	// spoken maps a trackfile's name, such as "Flash", to the flight callsign the GCI calls it
+	// by, such as "ford 9 1". Set by the mission with the aliases.
+	spoken map[string]string
 }
 
 func newContactDatabase() *contactDatabase {
@@ -85,14 +89,40 @@ func (db *contactDatabase) getByCallsignAndCoalititon(callsign string, coalition
 // callsign as a pilot says it ("Ford 9-1"), each value the trackfile's name ("Flash").
 func (db *contactDatabase) setAliases(aliases map[string]string) {
 	normalized := make(map[string]string, len(aliases))
+	spoken := make(map[string]string, len(aliases))
 	for callsign, name := range aliases {
-		if parsed, ok := callsigns.ParsePilotCallsign(callsign); ok && name != "" {
-			normalized[parsed] = name
+		parsed, ok := callsigns.ParsePilotCallsign(callsign)
+		if !ok || name == "" {
+			continue
+		}
+		normalized[parsed] = name
+		if current, ok := spoken[name]; !ok || isPreferredSpokenCallsign(parsed, current) {
+			spoken[name] = parsed
 		}
 	}
 	db.lock.Lock()
 	defer db.lock.Unlock()
 	db.aliases = normalized
+	db.spoken = spoken
+}
+
+// isPreferredSpokenCallsign is true if candidate names a player better than current: "ford 9" is
+// the lead of "ford 9 1", so the seat, with more words, wins. A tie goes to the first in order.
+func isPreferredSpokenCallsign(candidate, current string) bool {
+	if a, b := len(strings.Fields(candidate)), len(strings.Fields(current)); a != b {
+		return a > b
+	}
+	return candidate < current
+}
+
+// spokenCallsign returns the flight callsign the mission says the trackfile with the given name
+// flies, such as "ford 9 1" for "Flash". The second return value is false if the mission did not
+// say.
+func (db *contactDatabase) spokenCallsign(name string) (string, bool) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+	callsign, ok := db.spoken[name]
+	return callsign, ok
 }
 
 // getByID returns the trackfile for the given unit ID, or nil if no trackfile was found.
