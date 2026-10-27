@@ -377,7 +377,9 @@ func atcKind(tokens []string) (brevity.ATCRequestKind, string) {
 		return brevity.ATCRadioCheck, ""
 	case hasPhrase(tokens, "say again") || hasToken(tokens, "repeat"):
 		return brevity.ATCSayAgain, ""
-	case hasToken(tokens, "clear", "clearing", "vacated"):
+	case isRunwayInUse(tokens):
+		return brevity.ATCRunwayInUse, ""
+	case hasToken(tokens, "clear", "clearing", "vacated") && !isClearance(tokens):
 		return brevity.ATCClear, ""
 	case hasToken(tokens, "start", "startup", "engine", "engines"):
 		return brevity.ATCStartup, ""
@@ -395,10 +397,39 @@ func atcKind(tokens []string) (brevity.ATCRequestKind, string) {
 	return brevity.ATCUnknown, ""
 }
 
+// clearancePhrases read a clearance back with "clear" for "cleared", in either order: "clear for
+// takeoff", "takeoff clear". "Clear of the runway" is not one.
+var clearancePhrases = []string{"clear for", "clear to", "takeoff clear", "land clear"}
+
+// isClearance is true for words that read a clearance back: "cleared", or "clear for takeoff".
+func isClearance(tokens []string) bool {
+	if hasToken(tokens, "cleared") {
+		return true
+	}
+	for _, phrase := range clearancePhrases {
+		if hasPhrase(tokens, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
+// runwayInUsePhrases ask which runway is in use.
+var runwayInUsePhrases = []string{"runway in use", "active runway", "say active", "the active", "runway in used"}
+
+func isRunwayInUse(tokens []string) bool {
+	for _, phrase := range runwayInUsePhrases {
+		if hasPhrase(tokens, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
 // isPatternReport is a call in the pattern, which a pilot makes without the station: "Viper 1-1,
 // initial", "Viper 1-1, base, gear down".
 func isPatternReport(tokens []string) bool {
-	if hasToken(tokens, "cleared") {
+	if isClearance(tokens) {
 		return false
 	}
 	kind, detail := atcKind(tokens)
@@ -433,7 +464,7 @@ func isReadback(tokens []string) bool {
 	if hasToken(tokens, "request", "requesting", "ready", "holding", "inbound", "airborne") {
 		return false
 	}
-	return hasToken(tokens, "cleared", "squawk", "wilco", "roger", "copy", "copies") || hasPhrase(tokens, "hold short")
+	return isClearance(tokens) || hasToken(tokens, "squawk", "wilco", "roger", "copy", "copies") || hasPhrase(tokens, "hold short")
 }
 
 // isEmergencyOpening is "mayday" or "pan", the words an emergency call opens with.
@@ -507,7 +538,7 @@ func ParseATC(tx string, loose bool) *brevity.ATCRequest {
 		}
 		rest := tokens[end:]
 		kind, detail := atcKind(rest)
-		if hasToken(rest, "cleared") && !hasToken(rest, "request", "requesting") {
+		if isClearance(rest) && !hasToken(rest, "request", "requesting") {
 			// "Tower, Viper 1-1, cleared for takeoff 25" reads the clearance back.
 			kind, detail = brevity.ATCReadback, ""
 		}

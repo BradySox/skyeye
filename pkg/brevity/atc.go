@@ -21,6 +21,8 @@ const (
 	ATCEmergency ATCRequestKind = "emergency"
 	// ATCRadioCheck is a radio check on an airfield frequency.
 	ATCRadioCheck ATCRequestKind = "radiocheck"
+	// ATCRunwayInUse asks for the runway in use: "request runway in use", "say active".
+	ATCRunwayInUse ATCRequestKind = "runway"
 	// ATCSayAgain asks the controller to repeat its last call.
 	ATCSayAgain ATCRequestKind = "sayagain"
 	// ATCReadback is a pilot reading back a clearance: the items, then the callsign.

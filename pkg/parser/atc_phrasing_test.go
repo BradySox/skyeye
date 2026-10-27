@@ -171,6 +171,10 @@ func TestParseATCPatternCalls(t *testing.T) {
 		{"Tower, Viper 1-1, flame out.", "viper 1 1", brevity.ATCEmergency, ""},
 		{"Tower, Viper 1-1, engine fire.", "viper 1 1", brevity.ATCEmergency, ""},
 		{"Ground, Viper 1-1, request engine start.", "viper 1 1", brevity.ATCStartup, ""},
+		// The runway in use (Test 65).
+		{"Hatzerim Tower, Enfield 4-1, request runway in use.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
+		{"Hatzerim Ground, Enfield 4-1, request active runway.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
+		{"Tower, Enfield 4-1, say active.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
 		// Hot brakes is not the break.
 		{"Tower, Viper 1-1, hot brakes.", "viper 1 1", brevity.ATCUnknown, ""},
 	} {
@@ -199,4 +203,21 @@ func TestParseATCPatternReportsAreNotReadbacks(t *testing.T) {
 	require.NotNil(t, actual)
 	require.Equal(t, "viper 1 1", actual.Callsign)
 	require.Equal(t, []string{"2", "3"}, actual.Numbers)
+}
+
+// "Clear" for "cleared" in a readback, in either order (Test 65); "clear of the runway" stays a
+// request.
+func TestParseATCClearReadbacks(t *testing.T) {
+	t.Parallel()
+	checkATCPhrasing(t, false, []atcPhrasingCase{
+		{"Enfield 4, clear for takeoff 2-3.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+		{"Enfield 4-1, clear to land runway 23.", "enfield 4 1", brevity.ATCReadback, []string{"23"}},
+		{"Enfield 4, runway 23, takeoff clear.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+		{"Clear for takeoff 23, Enfield 4.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+		{"Tower, Enfield 4, clear for takeoff 23.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+		{"Tower, Enfield 4, clear of the runway.", "enfield 4", brevity.ATCClear, nil},
+	})
+	checkATCPhrasing(t, true, []atcPhrasingCase{
+		{"Enfield 4, clear for takeoff 2-3.", "enfield 4", brevity.ATCReadback, []string{"23"}},
+	})
 }
