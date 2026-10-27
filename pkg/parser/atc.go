@@ -284,7 +284,7 @@ const (
 	// DetailOverhead asks for the overhead break.
 	DetailOverhead = "overhead"
 	// DetailStraightIn asks for a straight-in approach.
-	DetailStraightIn = "straightin"
+	DetailStraightIn = "straight-in"
 	// DetailInitial reports the initial point of the overhead.
 	DetailInitial = "initial"
 	// DetailBreak reports the break.
@@ -341,7 +341,7 @@ func isBreak(tokens []string) bool {
 }
 
 func isStraightIn(tokens []string) bool {
-	return hasToken(tokens, "straightin") || hasPhrase(tokens, "straight in")
+	return hasPhrase(tokens, "straight in")
 }
 
 // arrivalDetail tells the arrival calls apart, nearest the runway first.

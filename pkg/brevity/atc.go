@@ -41,7 +41,7 @@ type ATCRequest struct {
 	Position string
 	// Kind of request.
 	Kind ATCRequestKind
-	// Detail qualifies the kind. Inbound: "overhead", "straightin", "initial", "break" or
+	// Detail qualifies the kind. Inbound: "overhead", "straight-in", "initial", "break" or
 	// "geardown" (base or final, the landing call). Taxi or ready: "numbers" ("have the numbers").
 	Detail string
 	// Numbers are the numbers heard, in order, without the callsign's: a runway or
