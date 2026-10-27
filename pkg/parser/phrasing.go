@@ -182,7 +182,7 @@ func (p *Parser) findControllerAfterFlightName(fields []string) (heard string, m
 
 // packageAcknowledgements answer a package controller and need no reply: "Ford 9, copy".
 var packageAcknowledgements = map[string]bool{
-	"copy": true, "copies": true, "wilco": true, "roger": true, "pushing": true, "egressing": true,
+	"copy": true, "copies": true, "wilco": true, "roger": true, "pushing": true,
 }
 
 // airbornePhrases report a flight off the runway: "Chevy 2, flight is airborne", "wheels up".
@@ -201,7 +201,7 @@ func isAirborneReport(tx string) bool {
 
 // parsePackageCallWithoutRequestWord reads a call to a package controller that names no request
 // word. "Check in" (and its aliases) or a bare "ready", which answers the roll call, is a check-in;
-// "airborne" or "wheels up" is an airborne report; an acknowledgement needs no reply; anything else asks the controller to say again, in its own
+// "airborne" or "wheels up" is an airborne report; "off target" or "egressing" is off target; an acknowledgement needs no reply; anything else asks the controller to say again, in its own
 // voice. Returns nil for an acknowledgement.
 func parsePackageCallWithoutRequestWord(tx, pilotCallsign, controller string) any {
 	fields := strings.Fields(tx)
@@ -210,6 +210,9 @@ func parsePackageCallWithoutRequestWord(tx, pilotCallsign, controller string) an
 	}
 	if isAirborneReport(tx) {
 		return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: controller, Kind: brevity.PackageAirborne}
+	}
+	if isOffTargetReport(tx) {
+		return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: controller, Kind: brevity.PackageOffTarget}
 	}
 	if strings.Contains(" "+tx+" ", " ready ") {
 		return &brevity.PackageRequest{Callsign: pilotCallsign, Controller: controller, Kind: brevity.PackageCheckIn}

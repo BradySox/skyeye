@@ -57,6 +57,26 @@ func TestParserPackageRequests(t *testing.T) {
 			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageCheckIn},
 		},
 		{
+			text:     "Ramrod, Colt 1-1, off target.",
+			expected: &brevity.PackageRequest{Callsign: "colt 1 1", Controller: "ramrod", Kind: brevity.PackageOffTarget},
+		},
+		{
+			text:     "Ramrod, Colt 1-1, off.",
+			expected: &brevity.PackageRequest{Callsign: "colt 1 1", Controller: "ramrod", Kind: brevity.PackageOffTarget},
+		},
+		{
+			text:     "Ramrod, Colt 1, egressing.",
+			expected: &brevity.PackageRequest{Callsign: "colt 1", Controller: "ramrod", Kind: brevity.PackageOffTarget},
+		},
+		{
+			text:     "Darkstar, Colt 1-1, off and egressing.",
+			expected: &brevity.PackageRequest{Callsign: "colt 1 1", Controller: "darkstar", Kind: brevity.PackageOffTarget},
+		},
+		{
+			text:     "Ramrod, Colt 1-1, off-target.",
+			expected: &brevity.PackageRequest{Callsign: "colt 1 1", Controller: "ramrod", Kind: brevity.PackageOffTarget},
+		},
+		{
 			text:     "Skyeye, Colt 1-1, ready to push.",
 			expected: &brevity.PackageRequest{Callsign: "colt 1 1", Controller: "skyeye", Kind: brevity.PackageReadyToPush},
 		},
@@ -67,6 +87,17 @@ func TestParserPackageRequests(t *testing.T) {
 		actual := request.(*brevity.PackageRequest)
 		require.Equal(t, *expected, *actual)
 	})
+}
+
+func TestParserOffTheGroundIsNotOffTarget(t *testing.T) {
+	t.Parallel()
+	request := newPackageParser().Parse("Ramrod, Chevy 2-1, off the ground.")
+	require.Equal(t, &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageAirborne}, request)
+}
+
+func TestParserCopyIsStillAnAcknowledgement(t *testing.T) {
+	t.Parallel()
+	require.Nil(t, newPackageParser().Parse("Ramrod, Colt 1-1, copy."))
 }
 
 func TestParserCheckInToTheGCIStaysACheckIn(t *testing.T) {
