@@ -113,8 +113,8 @@ func (p *Parser) normalizeText(tx string) string {
 }
 
 // ParseLoosePackageCall reads a package call that names only the pilot, such as "Colt 1 1, ready to
-// push", for the first package controller. Only for text heard on the strike frequency when the
-// mission allows loose calls. Returns nil when it is not a package call.
+// push", for the first package controller. Only for text heard on the strike frequency. Returns nil
+// when it is not a package call.
 func (p *Parser) ParseLoosePackageCall(tx string) *brevity.PackageRequest {
 	p.packageControllersLock.RLock()
 	controller := ""
