@@ -85,12 +85,22 @@ func parseStrictCallsign(s string) (*strictCallsign, bool) {
 	}, true
 }
 
+// friendlyCallsign returns the callsign the GCI calls a friendly by in a call it makes unasked,
+// such as a threat call: the flight callsign the mission says the player flies, as bogey dope
+// answers it, else the callsign parsed from the trackfile's name.
+func (c *Controller) friendlyCallsign(friendly *trackfiles.Trackfile) (string, bool) {
+	if callsign, ok := c.scope.SpokenCallsign(friendly.Contact.Name); ok {
+		return callsign, true
+	}
+	return callsigns.ParsePilotCallsign(friendly.Contact.Name)
+}
+
 // getFriendlyCallsigns returns all parseable callsigns for all friendly trackfiles.
 func (c *Controller) getFriendlyCallsigns() []string {
 	friendlies := c.scope.FindByCoalition(c.coalition)
 	friendlyCallsigns := []string{}
 	for _, friendly := range friendlies {
-		if callsign, ok := callsigns.ParsePilotCallsign(friendly.Contact.Name); ok {
+		if callsign, ok := c.friendlyCallsign(friendly); ok {
 			friendlyCallsigns = append(friendlyCallsigns, callsign)
 		}
 	}

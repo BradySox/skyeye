@@ -299,3 +299,26 @@ func TestGetByCallsignAlias(t *testing.T) {
 	assert.Equal(t, "flash", name)
 	assert.Equal(t, trackfile, tf)
 }
+
+// A player the mission names by flight callsign is called by the seat they fly, never by its lead.
+func TestSpokenCallsign(t *testing.T) {
+	t.Parallel()
+	db := newContactDatabase()
+
+	_, ok := db.spokenCallsign("Flash")
+	require.False(t, ok)
+
+	db.setAliases(map[string]string{"Ford 9-1": "Flash", "Ford 9": "Flash", "Enfield 4-1": "Mace"})
+	callsign, ok := db.spokenCallsign("Flash")
+	require.True(t, ok)
+	assert.Equal(t, "ford 9 1", callsign)
+	callsign, ok = db.spokenCallsign("Mace")
+	require.True(t, ok)
+	assert.Equal(t, "enfield 4 1", callsign)
+	_, ok = db.spokenCallsign("Ford 9 1")
+	require.False(t, ok)
+
+	db.setAliases(map[string]string{"Enfield 4-1": "Mace"})
+	_, ok = db.spokenCallsign("Flash")
+	require.False(t, ok)
+}
