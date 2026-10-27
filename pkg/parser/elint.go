@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dharmab/numwords"
 	"github.com/dharmab/skyeye/pkg/brevity"
@@ -127,6 +128,12 @@ func radarWords(fields []string, i int) int {
 // parseMudBearing reads a bearing of one to three digits, spoken digit by digit or as one number.
 // A radar named before it is skipped: "mud SA-6 185", "mud Hawk 185".
 func parseMudBearing(fields []string) (string, bool) {
+	bearing, _, ok := mudBearingAt(fields)
+	return bearing, ok
+}
+
+// mudBearingAt is parseMudBearing, with the index of the first field after the bearing.
+func mudBearingAt(fields []string) (bearing string, end int, ok bool) {
 	i := 0
 	for i < len(fields) {
 		skip := radarWords(fields, i)
@@ -150,13 +157,66 @@ func parseMudBearing(fields []string) (string, bool) {
 		digits.WriteString(f)
 	}
 	if digits.Len() == 0 || digits.Len() > 3 {
-		return "", false
+		return "", i, false
 	}
 	n, err := strconv.Atoi(digits.String())
 	if err != nil || n > 360 {
-		return "", false
+		return "", i, false
 	}
-	return fmt.Sprintf("%03d", n%360), true
+	return fmt.Sprintf("%03d", n%360), i, true
+}
+
+// MudFollowUpWindow is how long after a mud call with no bearing ("say mud bearing") the same
+// caller's bare bearing, such as "1 8 0", still answers it.
+const MudFollowUpWindow = 30 * time.Second
+
+type pendingMud struct {
+	request brevity.ELINTRequest
+	at      time.Time
+}
+
+// AwaitMudBearing remembers a mud call heard with no bearing, so caller's next bare bearing is
+// taken as that call. caller names the radio and frequency it was heard from.
+func (p *Parser) AwaitMudBearing(caller string, request *brevity.ELINTRequest, now time.Time) {
+	if caller == "" || request == nil || request.Kind != brevity.ELINTMud || request.Bearing != "" {
+		return
+	}
+	p.mudLock.Lock()
+	defer p.mudLock.Unlock()
+	if p.pendingMuds == nil {
+		p.pendingMuds = make(map[string]pendingMud)
+	}
+	p.pendingMuds[caller] = pendingMud{request: *request, at: now}
+}
+
+// ParseMudFollowUp reads a bare bearing ("1 8 0", "one eight zero", "mud 180") from a caller
+// whose mud call had none, within MudFollowUpWindow. Returns nil otherwise.
+func (p *Parser) ParseMudFollowUp(tx string, caller string, now time.Time) *brevity.ELINTRequest {
+	if caller == "" || len(tx) > maxInputLength {
+		return nil
+	}
+	p.mudLock.Lock()
+	defer p.mudLock.Unlock()
+	pending, ok := p.pendingMuds[caller]
+	if !ok {
+		return nil
+	}
+	if now.Sub(pending.at) > MudFollowUpWindow {
+		delete(p.pendingMuds, caller)
+		return nil
+	}
+	fields := strings.Fields(p.normalizeText(tx))
+	if len(fields) > 0 && (fields[0] == "mud" || mudHomophones[fields[0]]) {
+		fields = fields[1:]
+	}
+	bearing, end, ok := mudBearingAt(fields)
+	if !ok || end != len(fields) {
+		return nil
+	}
+	delete(p.pendingMuds, caller)
+	request := pending.request
+	request.Bearing = bearing
+	return &request
 }
 
 func isEmitterWord(w string) bool {

@@ -22,6 +22,17 @@ func (a *Application) parse(ctx context.Context, in <-chan Message[string], out 
 	}
 }
 
+// mudCaller names the radio and frequency a call came from, so a bare bearing after "say mud
+// bearing" is matched to its own caller. Empty when either is unknown.
+func mudCaller(ctx context.Context) string {
+	name := traces.GetClientName(ctx)
+	frequency, ok := heardFrequencyFrom(ctx)
+	if name == "" || !ok {
+		return ""
+	}
+	return name + "|" + frequency.String()
+}
+
 // parseText parses a single transcribed transmission, publishing any successfully parsed requests to the output channel.
 func (a *Application) parseText(ctx context.Context, text string, out chan<- Message[any]) {
 	logger := log.Logger
@@ -39,8 +50,12 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 		if call := parser.ParseATC(text, loose); call != nil {
 			request = call
 		}
+	} else if call := a.parser.ParseMudFollowUp(text, mudCaller(ctx), time.Now()); call != nil {
+		// A bare bearing answering Vacuum's "say mud bearing".
+		request = call
 	} else if call := a.parser.ParseELINT(text, a.elintSpeakerOn(ctx)); call != nil {
 		// A call to Vacuum is the mission's to answer, never the GCI's.
+		a.parser.AwaitMudBearing(mudCaller(ctx), call, time.Now())
 		request = call
 	} else {
 		request = a.parser.Parse(text)
