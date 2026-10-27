@@ -60,6 +60,19 @@ func TestParseELINT(t *testing.T) {
 		{"Vacuum, Ford 9, two ship, checking in", brevity.ELINTCheckIn, "ford 9", ""},
 		{"Vacuum, Ford 9-1, mud two seven zero", brevity.ELINTMud, "ford 9 1", "270"},
 		{"Ford 9-1, Vacuum, mud 270", brevity.ELINTMud, "ford 9 1", "270"},
+		// Whisper glues the bearing onto a radar name (2026-10-26): the SA number is not the bearing.
+		{"Vacuum, Enfield 4-1, MUD, SA-6-185.", brevity.ELINTMud, "enfield 4 1", "185"},
+		{"Vacuum, Ford 9, mud SA-6 185", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mud, SA 6, 1 8 5", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mud S-A-6 185", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mud SA6 185", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mud SA-10, one eight five", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mud SA-11-270", brevity.ELINTMud, "ford 9", "270"},
+		{"Vacuum, Ford 9, mud 185 SA-6", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mud Hawk 185", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mud spike SA-6 at 185", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mod SA-6 185", brevity.ELINTMud, "ford 9", "185"},
+		{"Vacuum, Ford 9, mud SA-6", brevity.ELINTMud, "ford 9", ""},
 	}
 	for _, test := range testCases {
 		t.Run(test.text, func(t *testing.T) {

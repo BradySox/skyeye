@@ -89,11 +89,54 @@ var mudHomophones = map[string]bool{"mod": true, "much": true, "mudd": true, "mu
 // bearingLeadIns are words between MUD and its bearing: "mud spike at 270", "mud bearing 270".
 var bearingLeadIns = map[string]bool{"at": true, "spike": true, "bearing": true, "is": true, "on": true, "of": true, "uh": true, "um": true}
 
+// radarNames are radar and SAM names a pilot may say beside a mud bearing: "mud Hawk 185".
+var radarNames = map[string]bool{
+	"sam": true, "radar": true, "hawk": true, "patriot": true, "roland": true, "rapier": true,
+	"nasams": true, "kub": true, "buk": true, "osa": true, "tor": true, "strela": true,
+	"tunguska": true, "pantsir": true, "gainful": true, "gecko": true, "gadfly": true,
+	"grumble": true, "goa": true, "guideline": true, "gladiator": true, "giant": true,
+	"gauntlet": true, "grison": true, "greyhound": true, "gopher": true, "grizzly": true,
+}
+
+// maxDesignatorDigits is the most digits an SA or HQ number takes: SA-6, SA-23.
+const maxDesignatorDigits = 2
+
+// radarWords is how many fields at i name a radar: "sa 6", "s a 6", "hq 7" or "hawk", else 0.
+// Whisper splits "SA-6-185" into "sa 6 185", so the number after SA is the system, not the bearing.
+func radarWords(fields []string, i int) int {
+	if radarNames[fields[i]] {
+		return 1
+	}
+	n := 0
+	switch {
+	case fields[i] == "sa" || fields[i] == "hq":
+		n = 1
+	case fields[i] == "s" && i+1 < len(fields) && fields[i+1] == "a":
+		n = 2
+	default:
+		return 0
+	}
+	if i+n < len(fields) && len(fields[i+n]) <= maxDesignatorDigits {
+		if _, err := strconv.Atoi(fields[i+n]); err == nil {
+			n++
+		}
+	}
+	return n
+}
+
 // parseMudBearing reads a bearing of one to three digits, spoken digit by digit or as one number.
+// A radar named before it is skipped: "mud SA-6 185", "mud Hawk 185".
 func parseMudBearing(fields []string) (string, bool) {
 	i := 0
-	for i < len(fields) && bearingLeadIns[fields[i]] {
-		i++
+	for i < len(fields) {
+		skip := radarWords(fields, i)
+		if bearingLeadIns[fields[i]] {
+			skip = 1
+		}
+		if skip == 0 {
+			break
+		}
+		i += skip
 	}
 	var digits strings.Builder
 	for ; i < len(fields) && digits.Len() < 3; i++ {
