@@ -213,8 +213,6 @@ var replacementLUT = map[string]string{
 	"buzzy":              bogeyDope,
 	"by vito":            bogeyDope,
 	"checkin in":         checkIn,
-	"like jack":          "blackjack",
-	"likejack":           "blackjack",
 	"checking in":        checkIn,
 	"check it in":        checkIn,
 	"checked in":         checkIn,
@@ -377,6 +375,9 @@ var replacementLUT = map[string]string{
 	"wokado":             bogeyDope,
 	"wookitup":           bogeyDope,
 	"wugito":             bogeyDope,
+	// RetLab package controller names.
+	"like jack":          "blackjack",
+	"likejack":           "blackjack",
 }
 
 type replacement struct {

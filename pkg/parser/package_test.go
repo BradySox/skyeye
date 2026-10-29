@@ -53,18 +53,6 @@ func TestParserPackageRequests(t *testing.T) {
 			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageAirborne},
 		},
 		{
-			text:     "- Likejack, Dodge 4, ready.",
-			expected: &brevity.PackageRequest{Callsign: "dodge 4", Controller: "blackjack", Kind: brevity.PackageCheckIn},
-		},
-		{
-			text:     "- Blackjack, Ford 2-1, heading to hold.",
-			expected: &brevity.PackageRequest{Callsign: "ford 2 1", Controller: "blackjack", Kind: brevity.PackageAirborne},
-		},
-		{
-			text:     "- Blackjack, Dodge, none ready.",
-			expected: &brevity.PackageRequest{Callsign: "dodge 9", Controller: "blackjack", Kind: brevity.PackageCheckIn},
-		},
-		{
 			text:     "Ramrod, Chevy 2-1, airborne, checking in.",
 			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageCheckIn},
 		},
@@ -91,6 +79,18 @@ func TestParserPackageRequests(t *testing.T) {
 		{
 			text:     "Skyeye, Colt 1-1, ready to push.",
 			expected: &brevity.PackageRequest{Callsign: "colt 1 1", Controller: "skyeye", Kind: brevity.PackageReadyToPush},
+		},
+		{
+			text:     "- Likejack, Dodge 4, ready.",
+			expected: &brevity.PackageRequest{Callsign: "dodge 4", Controller: "blackjack", Kind: brevity.PackageCheckIn},
+		},
+		{
+			text:     "- Blackjack, Ford 2-1, heading to hold.",
+			expected: &brevity.PackageRequest{Callsign: "ford 2 1", Controller: "blackjack", Kind: brevity.PackageAirborne},
+		},
+		{
+			text:     "- Blackjack, Dodge, none ready.",
+			expected: &brevity.PackageRequest{Callsign: "dodge 9", Controller: "blackjack", Kind: brevity.PackageCheckIn},
 		},
 	}
 	runParserTestCases(t, newPackageParser(), testCases, func(t *testing.T, test parserTestCase, request any) {
