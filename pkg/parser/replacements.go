@@ -4,6 +4,12 @@ import (
 	"slices"
 )
 
+// sayEmitters and samEmitters are Vacuum's emitters request.
+const (
+	sayEmitters = "say emitters"
+	samEmitters = "sam emitters"
+)
+
 // replacementLUT is a map of alternate forms of request words. These are used
 // to provide aliases for certain commands and to deal with quality issues in
 // speech-to-text. Do not use this variable directly, instead use replacements
@@ -38,6 +44,8 @@ var replacementLUT = map[string]string{
 	"bobby doke":         bogeyDope,
 	"bobby dope":         bogeyDope,
 	"bobbydo":            bogeyDope,
+	"bodiedope":          bogeyDope,
+	"wogido":             bogeyDope,
 	"bobi dop":           bogeyDope,
 	"bobi dubba":         bogeyDope,
 	"bobido":             bogeyDope,
@@ -234,6 +242,14 @@ var replacementLUT = map[string]string{
 	"comsjack":           radioCheck,
 	"cons check":         radioCheck,
 	"declared":           declare,
+	"deflare":            declare,
+	"de flare":           declare,
+	"becker":             vector,
+	"better to":          vector + " to",
+	"say mrs":            sayEmitters,
+	"sayy mrs":           sayEmitters,
+	"same it as":         samEmitters,
+	"sam in misses":      samEmitters,
 	"dody dot":           bogeyDope,
 	"doggy dope":         bogeyDope,
 	"dogito":             bogeyDope,

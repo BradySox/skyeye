@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var bullseyeWords = []string{"bullseye", "bulls"}
+var bullseyeWords = []string{"bullseye", "bulls", "bulsai", "balsai", "borsai", "folsa"}
 
 func parseBullseye(stream *token.Stream) *brevity.Bullseye {
 	for _, word := range bullseyeWords {
