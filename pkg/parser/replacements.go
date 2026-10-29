@@ -4,6 +4,9 @@ import (
 	"slices"
 )
 
+// blackjack is a RetLab package controller callsign.
+const blackjack = "blackjack"
+
 // replacementLUT is a map of alternate forms of request words. These are used
 // to provide aliases for certain commands and to deal with quality issues in
 // speech-to-text. Do not use this variable directly, instead use replacements
@@ -376,8 +379,8 @@ var replacementLUT = map[string]string{
 	"wookitup":           bogeyDope,
 	"wugito":             bogeyDope,
 	// RetLab package controller names.
-	"like jack": "blackjack",
-	"likejack":  "blackjack",
+	"like jack": blackjack,
+	"likejack":  blackjack,
 }
 
 type replacement struct {
