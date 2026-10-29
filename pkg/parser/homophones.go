@@ -18,6 +18,12 @@ var controllerHomophones = map[string]string{"amble": anvil, "envil": anvil}
 
 const anvil = "anvil"
 
+// sayEmitters and samEmitters are Vacuum's emitters request.
+const (
+	sayEmitters = "say emitters"
+	samEmitters = "sam emitters"
+)
+
 // fixHeardWords corrects a normalized call's words. wake is true for a word that names the GCI,
 // a controller or a speaker.
 func fixHeardWords(text string, wake func(string) bool) string {

@@ -4,12 +4,6 @@ import (
 	"slices"
 )
 
-// sayEmitters and samEmitters are Vacuum's emitters request.
-const (
-	sayEmitters = "say emitters"
-	samEmitters = "sam emitters"
-)
-
 // replacementLUT is a map of alternate forms of request words. These are used
 // to provide aliases for certain commands and to deal with quality issues in
 // speech-to-text. Do not use this variable directly, instead use replacements
