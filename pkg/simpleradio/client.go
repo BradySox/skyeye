@@ -83,6 +83,12 @@ type Client struct {
 	// listenRadioCount is how many radios at the end of clientInfo.RadioInfo.Radios are listen
 	// radios: heard, and transmitted on only when a transmission names them.
 	listenRadioCount int
+	// recorder takes the calls on recorded radios; nil records nothing.
+	recorder Recorder
+	// recorded are the radios RecordRadios records, true for a record-only one. radioLock guards it.
+	recorded map[types.Radio]bool
+	// recordChan queues heard calls for the recorder.
+	recordChan chan recording
 	// packetNumber is incremented for each voice packet transmitted.
 	packetNumber uint64
 	// txLock prevents multiple outgoing transmissions from occurring simultaneously. It must be acquired before writing
@@ -128,6 +134,7 @@ func NewClient(config types.ClientConfiguration) (*Client, error) {
 		txChan:       make(chan Transmission),
 		rxChan:       make(chan Transmission),
 		receivers:    receivers,
+		recordChan:   make(chan recording, 16),
 		packetNumber: 1,
 		mute:         config.Mute,
 		lastPing:     time.Now(),
@@ -228,6 +235,7 @@ func (c *Client) Run(ctx context.Context, wg *sync.WaitGroup) error {
 		voiceBytesRxChan := make(chan []voice.Packet, 128)
 		wg.Go(func() { c.receiveVoice(ctx, udpVoiceRxChan, voiceBytesRxChan) })
 		wg.Go(func() { c.decodeVoice(ctx, voiceBytesRxChan) })
+		wg.Go(func() { c.recordVoice(ctx) })
 
 		voicePacketsTxChan := make(chan outgoing, 3)
 		wg.Go(func() { c.encodeVoice(ctx, voicePacketsTxChan) })

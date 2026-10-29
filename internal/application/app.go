@@ -21,6 +21,7 @@ import (
 	"github.com/dharmab/skyeye/pkg/missionlink"
 	"github.com/dharmab/skyeye/pkg/parser"
 	"github.com/dharmab/skyeye/pkg/radar"
+	"github.com/dharmab/skyeye/pkg/radiorecord"
 	"github.com/dharmab/skyeye/pkg/recognizer"
 	"github.com/dharmab/skyeye/pkg/sim"
 	"github.com/dharmab/skyeye/pkg/simpleradio"
@@ -72,6 +73,8 @@ type Application struct {
 	voiceSpeakers map[string]speakers.Speaker
 	// voicesDir holds extra Piper voices a mission may ask for
 	voicesDir string
+	// recorder writes the frequencies a mission asks to record, for Tacview
+	recorder *radiorecord.Recorder
 	// speakersLock guards speakers, gciVoice, strike, atcFrequencies and elintFrequencies
 	speakersLock sync.Mutex
 	// gciVoice is SkyEye's own voice; a mission may change it
@@ -303,6 +306,7 @@ func NewApplication(config conf.Configuration) (*Application, error) {
 		voiceSpeakers:              map[string]speakers.Speaker{builtinVoiceName(config.Voice): synthesizer},
 		gciVoice:                   builtinVoiceName(config.Voice),
 		voicesDir:                  config.VoicesDir,
+		recorder:                   radiorecord.New(recordingDir(config.RecordingDir), telemetryClient.Time),
 		voiceSpeed:                 config.VoiceSpeed,
 		voicePause:                 config.VoicePauseLength,
 		speakerLock:                config.VoiceLock,
@@ -351,6 +355,11 @@ func (a *Application) Run(ctx context.Context, cancel context.CancelFunc, wg *sy
 		}
 	})
 
+	a.srsClient.SetRecorder(a.recorder)
+	wg.Go(func() {
+		<-ctx.Done()
+		a.recorder.Close()
+	})
 	wg.Go(func() {
 		log.Info().Msg("running SRS client")
 		if err := a.srsClient.Run(ctx, wg); err != nil {

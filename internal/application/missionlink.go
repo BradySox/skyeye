@@ -347,6 +347,7 @@ func (a *Application) runMissionLink(ctx context.Context, out chan<- Message[com
 		OnPackages: a.applyPackages,
 		OnATC:      a.applyATC,
 		OnTune:     a.applyTune,
+		OnRecord:   a.applyRecord,
 		OnEmitter: func(emitter missionlink.Emitter) {
 			a.addSpeakerVocabulary(emitter.Callsign)
 			bullseye := a.radar.BullseyeOf(orb.Point{emitter.Lon, emitter.Lat})
