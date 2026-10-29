@@ -47,10 +47,10 @@ func (c *Client) RecordRadios(frequencies []RadioFrequency, recordOnly []bool) e
 
 // recordedRadio is the recorded radio matching radio, and whether it is record-only. Call it with
 // radioLock held.
-func (c *Client) recordedRadio(radio types.Radio) (types.Radio, bool, bool) {
-	for recorded, only := range c.recorded {
-		if recorded.IsSameFrequency(radio) {
-			return recorded, only, true
+func (c *Client) recordedRadio(radio types.Radio) (recorded types.Radio, recordOnly bool, ok bool) {
+	for r, only := range c.recorded {
+		if r.IsSameFrequency(radio) {
+			return r, only, true
 		}
 	}
 	return types.Radio{}, false, false

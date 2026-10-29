@@ -82,7 +82,8 @@ func TestRecordPlacesCallsByMissionTime(t *testing.T) {
 func TestOverlappingCallsMix(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	fixed := time.Date(2026, 10, 29, 16, 40, 0, 0, time.UTC)
+	// Half a second past the minute, so the file starts at 16:40:00 however the clock jitters.
+	fixed := time.Date(2026, 10, 29, 16, 40, 0, 500_000_000, time.UTC)
 	wall := time.Now()
 	r := New(dir, func() time.Time { return fixed.Add(time.Since(wall)) })
 	r.SetFrequencies(map[string]string{"264.500AM": "STRIKE"})
@@ -93,8 +94,8 @@ func TestOverlappingCallsMix(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 	samples := readWAV(t, files[0])
-	require.InDelta(t, 16384, samples[SampleRate/4], 2)
-	require.InDelta(t, 8192, samples[3*SampleRate/4], 2)
+	require.InDelta(t, 16384, samples[SampleRate/2+SampleRate/4], 2)
+	require.InDelta(t, 8192, samples[SampleRate/2+3*SampleRate/4], 2)
 }
 
 func TestNoClockNoRecording(t *testing.T) {
