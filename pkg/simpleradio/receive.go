@@ -18,6 +18,8 @@ type receiver struct {
 	buffer []voice.Packet
 	// origin is the GUID of a client we are currently listening to. We can only listen to one client at a time, and whoever started broadcasting first wins.
 	origin types.GUID
+	// started is when the transmission's first packet arrived.
+	started time.Time
 	// deadline is extended every time another voice packet is received. When we pass the deadline, the transmission is considered over.
 	deadline time.Time
 	// packetNumber is the number of the last received voice packet. We only record a packet if its packet number is larger than the last received packet's, and skip any that were dropped or delivered out of order.
@@ -44,12 +46,12 @@ func (r *receiver) receive(packet *voice.Packet) {
 		return
 	}
 
-	if isNewTransmission {
-		log.Info().Str("origin", string(packet.OriginGUID)).Msg("receiving transmission")
-	}
-
 	r.lock.Lock()
 	defer r.lock.Unlock()
+	if isNewTransmission {
+		log.Info().Str("origin", string(packet.OriginGUID)).Msg("receiving transmission")
+		r.started = time.Now()
+	}
 	if len(r.buffer) < maxRxPackets {
 		r.buffer = append(r.buffer, *packet)
 	}
@@ -80,6 +82,7 @@ func (r *receiver) reset() {
 	defer r.lock.Unlock()
 	r.buffer = make([]voice.Packet, 0)
 	r.origin = ""
+	r.started = time.Time{}
 	r.deadline = time.Time{}
 	r.packetNumber = 0
 }
@@ -148,11 +151,14 @@ func (c *Client) receiveVoice(ctx context.Context, in <-chan []byte, out chan<- 
 			// Check if everyone has stopped talking.
 			if len(in) == 0 {
 				c.radioLock.RLock()
-				for _, receiver := range c.receivers {
+				for radio, receiver := range c.receivers {
 					if receiver.hasTransmission() {
 						duration := time.Duration(len(receiver.buffer)) * frameLength
 						logger := log.With().Stringer("duration", duration).Logger()
-						if duration > minRxDuration {
+						if c.queueRecording(radio, receiver) {
+							// A record-only frequency is never answered.
+							logger.Debug().Msg("recorded transmission on a record-only frequency")
+						} else if duration > minRxDuration {
 							if len(receiver.buffer) >= maxRxPackets {
 								logger.Warn().Stringer("max", MaxTransmissionDuration).Msg("transmission truncated to maximum duration")
 							}

@@ -130,6 +130,12 @@
 # voices/en_GB-alan-medium with its .onnx and .onnx.json). Download voices from
 # https://huggingface.co/rhasspy/piper-voices.
 #voices-dir: voices
+#
+# A mission can ask SkyEye to record its frequencies for Tacview: one WAV file
+# per frequency, named with the mission time it starts at, so Tacview plays it
+# with the replay. Tacview's Auto Load Media add-on finds audio next to the
+# .acmi, so the default is Documents/Tacview.
+#recording-dir: C:/Users/me/Documents/Tacview
 
 # IDENTITY
 # Set the callsign to whatever you want the GCI to use as the callsign. Good

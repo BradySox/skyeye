@@ -101,7 +101,7 @@ func (c *Client) encodeVoice(ctx context.Context, packetChan chan<- outgoing) {
 				sender.packetNumber++
 				txPackets = append(txPackets, voicePacket)
 			}
-			packetChan <- outgoing{from: sender, packets: txPackets}
+			packetChan <- outgoing{from: sender, packets: txPackets, audio: transmission.Audio, frequencies: frequencyList}
 		case <-ctx.Done():
 			log.Info().Msg("stopping voice encoder due to context cancellation")
 			return

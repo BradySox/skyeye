@@ -52,6 +52,8 @@ type Configuration struct {
 	GRPCAPIKey string
 	// VoicesDir is a folder of extra Piper voices (one subfolder each) a mission may ask for.
 	VoicesDir string
+	// RecordingDir is the folder the radio recorder writes to; empty is Documents\Tacview.
+	RecordingDir string
 	// MissionLinkAddress is the local UDP address a mission script running a package controller
 	// talks to SkyEye on. Empty disables the mission link.
 	MissionLinkAddress string

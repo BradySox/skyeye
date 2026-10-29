@@ -204,4 +204,8 @@ type outgoing struct {
 	from *Client
 	// packets of the transmission.
 	packets []voice.Packet
+	// audio of the transmission, for the recorder.
+	audio []float32
+	// frequencies the transmission goes out on.
+	frequencies []voice.Frequency
 }

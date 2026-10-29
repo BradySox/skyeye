@@ -28,7 +28,9 @@ func (c *Client) transmitPackets(ctx context.Context, packetChan <-chan outgoing
 				defer lock.Unlock()
 				c.waitForClearChannel()
 				if !c.mute {
+					started := time.Now()
 					out.from.writePackets(out.packets)
+					c.recordSpoken(out, started)
 				}
 			}()
 			// Pause between transmissions to sound more natural.

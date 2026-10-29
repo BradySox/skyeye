@@ -221,3 +221,17 @@ func TestOlderMissionFieldsAreIgnored(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(`{"type":"atc","fields":[],"discipline":"strict","callsigns":["Uzi 2"]}`), &atc))
 	require.Equal(t, []string{"Uzi 2"}, atc.Callsigns)
 }
+
+// A record message lists the frequencies to record, a player flight's as record-only.
+func TestLinkRecord(t *testing.T) {
+	t.Parallel()
+	link, err := Listen("127.0.0.1:0")
+	require.NoError(t, err)
+	var record Record
+	handlers := Handlers{OnRecord: func(m Record) { record = m }}
+	link.handle([]byte(`{"type":"record","frequencies":[{"frequency":"251.000AM","label":"AWACS"},{"frequency":"130.250AM","label":"Enfield 4","recordOnly":true}]}`), nil, handlers)
+	require.Equal(t, Record{Type: TypeRecord, Frequencies: []RecordFrequency{
+		{Frequency: "251.000AM", Label: "AWACS"},
+		{Frequency: "130.250AM", Label: "Enfield 4", RecordOnly: true},
+	}}, record)
+}

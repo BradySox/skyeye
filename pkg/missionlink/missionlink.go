@@ -32,6 +32,8 @@ const (
 	TypeATCRequest = "atcRequest"
 	// TypeELINTRequest is a call to a mission ELINT speaker SkyEye heard, sent to the mission.
 	TypeELINTRequest = "elintRequest"
+	// TypeRecord asks SkyEye to record frequencies for Tacview.
+	TypeRecord = "record"
 )
 
 // peerELINT is the peer that tunes for an ELINT speaker.
@@ -123,6 +125,24 @@ type Emitter struct {
 	Lon float64 `json:"lon"`
 }
 
+// RecordFrequency is one frequency to record.
+type RecordFrequency struct {
+	// Frequency to record, such as "251.000AM".
+	Frequency string `json:"frequency"`
+	// Label names the frequency in the file name, such as "AWACS" or "Enfield 4".
+	Label string `json:"label,omitempty"`
+	// RecordOnly frequencies are recorded and never answered: a player flight's own frequency.
+	RecordOnly bool `json:"recordOnly,omitempty"`
+}
+
+// Record asks SkyEye to record every call heard or spoken on the frequencies, one WAV file each,
+// for playback with the Tacview recording. It replaces the frequencies recorded before; an empty
+// list stops recording.
+type Record struct {
+	Type        string            `json:"type"`
+	Frequencies []RecordFrequency `json:"frequencies"`
+}
+
 // ATCPosition is one controller position at an airfield.
 type ATCPosition struct {
 	// Position is "ground", "tower", "departure", "approach", "arrival" or "emergency".
@@ -191,6 +211,7 @@ type Handlers struct {
 	OnTune     func(Tune)
 	OnEmitter  func(Emitter)
 	OnATC      func(ATC)
+	OnRecord   func(Record)
 }
 
 // Link is the UDP link.
@@ -299,6 +320,15 @@ func (l *Link) handle(b []byte, from *net.UDPAddr, handlers Handlers) {
 		l.setPeer(TypeATC, from)
 		if handlers.OnATC != nil {
 			handlers.OnATC(atc)
+		}
+	case TypeRecord:
+		var record Record
+		if err := json.Unmarshal(b, &record); err != nil {
+			log.Warn().Err(err).Msg("ignoring unreadable record message")
+			return
+		}
+		if handlers.OnRecord != nil {
+			handlers.OnRecord(record)
 		}
 	default:
 		log.Warn().Str("type", envelope.Type).Msg("ignoring unknown mission link message")
