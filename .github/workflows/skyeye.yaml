@@ -44,44 +44,6 @@ jobs:
         uses: ./.github/actions/build-whisper
       - name: Test
         run: make test
-  build-linux-amd64:
-    name: Build on Linux AMD64
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Setup
-        uses: ./.github/actions/setup
-      - name: Build whisper.cpp
-        uses: ./.github/actions/build-whisper
-      - name: Build SkyEye
-        run: make skyeye
-      - name: Build SkyEye Scaler
-        run: make skyeye-scaler
-      - name: Create dist
-        shell: bash
-        run: |
-          mkdir -p dist/skyeye-linux-amd64/docs/
-          cp skyeye dist/skyeye-linux-amd64/skyeye
-          cp skyeye-scaler dist/skyeye-linux-amd64/skyeye-scaler
-          chmod +x dist/skyeye-linux-amd64/skyeye
-          chmod +x dist/skyeye-linux-amd64/skyeye-scaler
-          cp README.md dist/skyeye-linux-amd64/README.md
-          cp LICENSE dist/skyeye-linux-amd64/LICENSE
-          cp config.yaml dist/skyeye-linux-amd64/config.yaml
-          cp docs/*.md dist/skyeye-linux-amd64/docs/
-          tar -czf dist/skyeye-linux-amd64.tar.gz -C dist skyeye-linux-amd64
-      - name: Upload artifact
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v5
-        with:
-          name: skyeye-linux-amd64.tar.gz
-          path: dist/skyeye-linux-amd64.tar.gz
-          if-no-files-found: error
-          overwrite: true
   build-windows-amd64:
     name: Build on Windows AMD64
     runs-on: windows-latest
@@ -143,48 +105,6 @@ jobs:
         with:
           name: skyeye-windows-amd64.zip
           path: dist/skyeye-windows-amd64.zip
-          if-no-files-found: error
-          overwrite: true
-  build-linux-amd64-vulkan:
-    name: Build on Linux AMD64 (Vulkan)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Setup
-        uses: ./.github/actions/setup
-      - name: Build whisper.cpp
-        uses: ./.github/actions/build-whisper
-        with:
-          make-args: GGML_VULKAN=1
-      - name: Build SkyEye
-        run: make skyeye-vulkan
-      - name: Build SkyEye Scaler
-        run: make skyeye-scaler
-      - name: Smoke test
-        run: ./skyeye-vulkan --help
-      - name: Create dist
-        shell: bash
-        run: |
-          mkdir -p dist/skyeye-linux-amd64-vulkan/docs/
-          cp skyeye-vulkan dist/skyeye-linux-amd64-vulkan/skyeye
-          cp skyeye-scaler dist/skyeye-linux-amd64-vulkan/skyeye-scaler
-          chmod +x dist/skyeye-linux-amd64-vulkan/skyeye
-          chmod +x dist/skyeye-linux-amd64-vulkan/skyeye-scaler
-          cp README.md dist/skyeye-linux-amd64-vulkan/README.md
-          cp LICENSE dist/skyeye-linux-amd64-vulkan/LICENSE
-          cp config.yaml dist/skyeye-linux-amd64-vulkan/config.yaml
-          cp docs/*.md dist/skyeye-linux-amd64-vulkan/docs/
-          tar -czf dist/skyeye-linux-amd64-vulkan.tar.gz -C dist skyeye-linux-amd64-vulkan
-      - name: Upload artifact
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v5
-        with:
-          name: skyeye-linux-amd64-vulkan.tar.gz
-          path: dist/skyeye-linux-amd64-vulkan.tar.gz
           if-no-files-found: error
           overwrite: true
   build-windows-amd64-vulkan:
@@ -258,26 +178,6 @@ jobs:
           path: dist/skyeye-windows-amd64-vulkan.zip
           if-no-files-found: error
           overwrite: true
-  build-image:
-    name: Build container image
-    if: "github.repository == 'dharmab/skyeye' && !startsWith(github.ref, 'refs/tags/')"
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Build image
-        uses: docker/build-push-action@v6
-        with:
-          build-args: |
-            SKYEYE_VERSION: ${{ env.GITHUB_REF_NAME }}
-      - name: Build Vulkan image
-        uses: docker/build-push-action@v6
-        with:
-          build-args: |
-            SKYEYE_VERSION: ${{ env.GITHUB_REF_NAME }}
-          target: skyeye-vulkan
   release:
     name: Upload release assets
     if: startsWith(github.ref, 'refs/tags/')
@@ -286,9 +186,7 @@ jobs:
     needs:
       - lint
       - test
-      - build-linux-amd64
       - build-windows-amd64
-      - build-linux-amd64-vulkan
       - build-windows-amd64-vulkan
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -305,48 +203,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/skyeye-linux-amd64.tar.gz
             dist/skyeye-windows-amd64.zip
-            dist/skyeye-linux-amd64-vulkan.tar.gz
             dist/skyeye-windows-amd64-vulkan.zip
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
-  push-images:
-    name: Build and push container images
-    if: "github.repository == 'dharmab/skyeye' && startsWith(github.ref, 'refs/tags/')"
-    needs:
-      - lint
-      - test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - name: Build and push image
-        uses: ./.github/actions/build-container
-        with:
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
-          image-name: ${{ github.repository }}
-          target: skyeye
-          skyeye-version: ${{ env.GITHUB_REF_NAME }}
-      - name: Build and push scaler image
-        uses: ./.github/actions/build-container
-        with:
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
-          image-name: ${{ github.repository }}-scaler
-          target: skyeye-scaler
-          skyeye-version: ${{ env.GITHUB_REF_NAME }}
-      - name: Build and push Vulkan image
-        uses: ./.github/actions/build-container
-        with:
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
-          image-name: ${{ github.repository }}
-          target: skyeye-vulkan
-          tag-suffix: -vulkan
-          skyeye-version: ${{ env.GITHUB_REF_NAME }}
