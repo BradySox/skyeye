@@ -9,6 +9,7 @@ package radiorecord
 import (
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
@@ -60,9 +61,7 @@ func (r *Recorder) SetFrequencies(labels map[string]string) {
 		}
 	}
 	r.labels = make(map[string]string, len(labels))
-	for k, v := range labels {
-		r.labels[k] = v
-	}
+	maps.Copy(r.labels, labels)
 }
 
 // IsRecorded is true if the frequency is one the recorder writes.
