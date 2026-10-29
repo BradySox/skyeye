@@ -1,0 +1,50 @@
+name: STT sweep
+on:
+  push:
+    branches: [retlab/stt-sweep]
+  workflow_dispatch:
+permissions: {}
+jobs:
+  sweep:
+    name: Speech sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup
+        uses: ./.github/actions/setup
+      - name: Build whisper.cpp
+        uses: ./.github/actions/build-whisper
+      - name: Get the model and voices
+        shell: bash
+        run: |
+          sudo apt-get install -y ffmpeg
+          pip install piper-tts
+          make download-whisper-ggml-small.en
+          mkdir -p voices
+          for v in en_US/joe/medium/en_US-joe-medium en_US/amy/medium/en_US-amy-medium en_GB/alan/medium/en_GB-alan-medium; do
+            for ext in onnx onnx.json; do
+              curl -sSL -o "voices/$(basename $v).$ext" "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/$v.$ext"
+            done
+          done
+      - name: Sweep
+        shell: bash
+        run: |
+          W="$PWD/third_party/whisper.cpp"
+          export CGO_ENABLED=1 C_INCLUDE_PATH="$W/ggml/include:$W/include" LIBRARY_PATH="$W/build_go/src:$W/build_go/ggml/src"
+          go build -tags nolibopusfile -o sttsweep ./tools/sttsweep
+          ./sttsweep list > calls.jsonl
+          python tools/sttsweep/synth.py calls.jsonl voices clips
+          ./sttsweep run "$PWD/ggml-small.en.bin" clips report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: stt-sweep
+          path: |
+            report.md
+            calls.jsonl
