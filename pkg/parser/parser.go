@@ -106,6 +106,7 @@ func (p *Parser) normalizeText(tx string) string {
 	for _, replacement := range replacements {
 		tx = strings.ReplaceAll(tx, replacement.Original, replacement.Normal)
 	}
+	tx = fixHeardWords(tx, p.isWakeWord)
 	if tx == "" {
 		return ""
 	}

@@ -28,6 +28,7 @@ const maxFieldNameWords = 4
 var atcDigitWords = map[string]string{
 	"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
 	"five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9", niner: "9",
+	"ii": "2", "iii": "3", "iv": "4",
 }
 
 // atcCallsignHomophones are words Whisper writes for digits, accepted only inside a callsign.
