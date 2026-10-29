@@ -9,7 +9,7 @@ import (
 
 func newPackageParser() *Parser {
 	p := New(TestCallsign, []string{}, true)
-	p.SetPackageControllers([]string{"Darkstar", "Ramrod"})
+	p.SetPackageControllers([]string{"Darkstar", "Ramrod", "Blackjack"})
 	return p
 }
 
@@ -51,6 +51,18 @@ func TestParserPackageRequests(t *testing.T) {
 		{
 			text:     "Ramrod, Chevy 2-1, departing.",
 			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageAirborne},
+		},
+		{
+			text:     "- Likejack, Dodge 4, ready.",
+			expected: &brevity.PackageRequest{Callsign: "dodge 4", Controller: "blackjack", Kind: brevity.PackageCheckIn},
+		},
+		{
+			text:     "- Blackjack, Ford 2-1, heading to hold.",
+			expected: &brevity.PackageRequest{Callsign: "ford 2 1", Controller: "blackjack", Kind: brevity.PackageAirborne},
+		},
+		{
+			text:     "- Blackjack, Dodge, none ready.",
+			expected: &brevity.PackageRequest{Callsign: "dodge 9", Controller: "blackjack", Kind: brevity.PackageCheckIn},
 		},
 		{
 			text:     "Ramrod, Chevy 2-1, airborne, checking in.",

@@ -41,6 +41,13 @@ func (a *Application) updateVocabulary(update func(*missionVocabulary)) {
 }
 
 // addSpeakerVocabulary adds a mission speaker's callsign to the vocabulary once.
+// fieldNames are the airfields the mission runs ATC for.
+func (a *Application) fieldNames() []string {
+	a.vocabularyLock.Lock()
+	defer a.vocabularyLock.Unlock()
+	return slices.Clone(a.vocabulary.fields)
+}
+
 func (a *Application) addSpeakerVocabulary(callsign string) {
 	if callsign == "" {
 		return

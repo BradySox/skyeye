@@ -28,6 +28,15 @@ func isDigitHomophone(word string) bool {
 	return ok || word == niner
 }
 
+// nineAfterName reads "none" right after the callsign's name as 9: "dodge none ready" is Dodge 9.
+func nineAfterName(text string) string {
+	fields := strings.Fields(text)
+	if len(fields) > 1 && fields[1] == "none" && !isAllDigits(fields[0]) {
+		fields[1] = "9"
+	}
+	return strings.Join(fields, " ")
+}
+
 // isCallsignEnd is a word after a number that is never part of a callsign: a distance or a flight
 // size.
 func isCallsignEnd(word string) bool {
@@ -186,7 +195,7 @@ var packageAcknowledgements = map[string]bool{
 }
 
 // airbornePhrases report a flight off the runway: "Chevy 2, flight is airborne", "wheels up".
-var airbornePhrases = []string{"airborne", "wheels up", "off the ground", "departing"}
+var airbornePhrases = []string{"airborne", "wheels up", "off the ground", "departing", "heading to hold", "proceeding to hold", "en route to hold", "enroute to hold"}
 
 // isAirborneReport is true if the call reports the flight airborne.
 func isAirborneReport(tx string) bool {

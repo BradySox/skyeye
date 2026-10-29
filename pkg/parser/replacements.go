@@ -213,6 +213,8 @@ var replacementLUT = map[string]string{
 	"buzzy":              bogeyDope,
 	"by vito":            bogeyDope,
 	"checkin in":         checkIn,
+	"like jack":          "blackjack",
+	"likejack":           "blackjack",
 	"checking in":        checkIn,
 	"check it in":        checkIn,
 	"checked in":         checkIn,

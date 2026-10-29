@@ -175,6 +175,8 @@ func TestParseATCPatternCalls(t *testing.T) {
 		{"Hatzerim Tower, Enfield 4-1, request runway in use.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
 		{"Hatzerim Ground, Enfield 4-1, request active runway.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
 		{"Tower, Enfield 4-1, say active.", "enfield 4 1", brevity.ATCRunwayInUse, ""},
+		// "None" heard for "nine" after the callsign's name.
+		{"Tower, Dodge none, holding short, runway 23.", "dodge 9", brevity.ATCReady, ""},
 		// Hot brakes is not the break.
 		{"Tower, Viper 1-1, hot brakes.", "viper 1 1", brevity.ATCUnknown, ""},
 	} {
@@ -220,4 +222,28 @@ func TestParseATCClearReadbacks(t *testing.T) {
 	checkATCPhrasing(t, true, []atcPhrasingCase{
 		{"Enfield 4, clear for takeoff 2-3.", "enfield 4", brevity.ATCReadback, []string{"23"}},
 	})
+}
+
+// A field name that opens a call with no station is not part of the callsign (2026-10-26 logs).
+func TestTrimFieldName(t *testing.T) {
+	t.Parallel()
+	fields := []string{"Hatzerim", "Shindand", "Spangdahlem"}
+	for _, test := range []struct {
+		text     string
+		callsign string
+		kind     brevity.ATCRequestKind
+	}{
+		{"Shindand, Springfield 2, ready to taxi.", "springfield 2", brevity.ATCTaxi},
+		{"Azarim, Uzi 2, outbound, runway 28.", "uzi 2", brevity.ATCAirborne},
+		{"Spangdahlem, Ground, Chevy 2, ready to taxi.", "chevy 2", brevity.ATCTaxi},
+		{"Springfield 2, ready to taxi.", "springfield 2", brevity.ATCTaxi},
+	} {
+		t.Run(test.text, func(t *testing.T) {
+			t.Parallel()
+			actual := ParseATC(TrimFieldName(test.text, fields), true)
+			require.NotNil(t, actual)
+			require.Equal(t, test.callsign, actual.Callsign)
+			require.Equal(t, test.kind, actual.Kind)
+		})
+	}
 }
