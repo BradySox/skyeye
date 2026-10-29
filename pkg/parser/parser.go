@@ -138,7 +138,7 @@ func (p *Parser) ParseLoosePackageCall(tx string) *brevity.PackageRequest {
 	} else {
 		return nil
 	}
-	pilot, ok := callsigns.ParsePilotCallsign(leadingCallsign(numwords.ParseString(strings.Join(before, " "))))
+	pilot, ok := callsigns.ParsePilotCallsign(leadingCallsign(numwords.ParseString(nineAfterName(strings.Join(before, " ")))))
 	if !ok {
 		return nil
 	}
@@ -355,7 +355,7 @@ func (p *Parser) Parse(tx string) any {
 	}
 	event.Msg("searching for pilot callsign in rest of text")
 
-	rest = trimLeadIns(leadingCallsign(numwords.ParseString(rest)))
+	rest = trimLeadIns(leadingCallsign(numwords.ParseString(nineAfterName(rest))))
 	pilotCallsign, ok := callsigns.ParsePilotCallsign(rest)
 	if ok {
 		logger = logger.With().Str("pilot", pilotCallsign).Logger()

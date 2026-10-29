@@ -276,7 +276,7 @@ func elintCallsign(fields []string) string {
 			words = words[:j+1]
 		}
 	}
-	callsign, ok := callsigns.ParsePilotCallsign(leadingCallsign(numwords.ParseString(strings.Join(words, " "))))
+	callsign, ok := callsigns.ParsePilotCallsign(leadingCallsign(numwords.ParseString(nineAfterName(strings.Join(words, " ")))))
 	if !ok {
 		return ""
 	}

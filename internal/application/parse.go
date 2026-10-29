@@ -49,7 +49,7 @@ func (a *Application) parseText(ctx context.Context, text string, out chan<- Mes
 		// An airfield frequency carries ATC calls only: the GCI never answers there. Every call is
 		// parsed loosely, with or without the station or the callsign; an older mission's
 		// discipline field is ignored.
-		if call := parser.ParseATC(text, true); call != nil {
+		if call := parser.ParseATC(parser.TrimFieldName(text, a.fieldNames()), true); call != nil {
 			request = call
 		}
 	} else if call := a.parser.ParseMudFollowUp(text, mudCaller(ctx), time.Now()); call != nil {

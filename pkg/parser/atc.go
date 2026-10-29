@@ -33,7 +33,7 @@ var atcDigitWords = map[string]string{
 // atcCallsignHomophones are words Whisper writes for digits, accepted only inside a callsign.
 var atcCallsignHomophones = map[string]string{
 	"won": "1", "to": "2", "too": "2", "tu": "2", "for": "4", "fore": "4",
-	"free": "3", "tree": "3", "ate": "8",
+	"free": "3", "tree": "3", "ate": "8", "none": "9",
 }
 
 // notCallsignWords open a request, never a callsign: "ready for takeoff" is not "Ready 4", and
@@ -492,6 +492,27 @@ func withoutSpan(tokens []string, from, to int) []string {
 	out := make([]string, 0, len(tokens))
 	out = append(out, tokens[:from]...)
 	return append(out, tokens[to:]...)
+}
+
+// TrimFieldName drops an airfield name that opens a call: in "Shindand, Springfield 2, ready to
+// taxi" with no Ground or Tower, the field would read as part of the callsign. The match is fuzzy
+// because Whisper misspells field names.
+func TrimFieldName(tx string, fields []string) string {
+	words := strings.Fields(tx)
+	for _, field := range fields {
+		n := len(strings.Fields(field))
+		if n == 0 || len(words) <= n {
+			continue
+		}
+		head := make([]string, n)
+		for i, w := range words[:n] {
+			head[i] = strings.Trim(w, ",.-!?")
+		}
+		if isSimilar(strings.Join(head, " "), field) {
+			return strings.Join(words[n:], " ")
+		}
+	}
+	return tx
 }
 
 // ParseATC reads a call heard on an airfield frequency. A call opens with the controller ("Kobuleti
