@@ -17,6 +17,12 @@ func TestParserRadioCheck(t *testing.T) {
 			},
 		},
 		{
+			text: "Skyeye, Wildcat11, radio check again",
+			expected: &brevity.RadioCheckRequest{
+				Callsign: "wildcat 1 1",
+			},
+		},
+		{
 			text: "Any face, Wildcat11, radio check",
 			expected: &brevity.RadioCheckRequest{
 				Callsign: "wildcat 1 1",

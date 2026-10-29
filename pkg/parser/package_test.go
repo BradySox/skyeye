@@ -53,6 +53,10 @@ func TestParserPackageRequests(t *testing.T) {
 			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageAirborne},
 		},
 		{
+			text:     "- Ramrod, Enfield 4, check again.",
+			expected: &brevity.PackageRequest{Callsign: "enfield 4", Controller: "ramrod", Kind: brevity.PackageCheckIn},
+		},
+		{
 			text:     "Ramrod, Chevy 2-1, airborne, checking in.",
 			expected: &brevity.PackageRequest{Callsign: "chevy 2 1", Controller: "ramrod", Kind: brevity.PackageCheckIn},
 		},
